@@ -33,7 +33,7 @@ ___
 
 ### Friday, 2018-01-05
 
-* 13:00 - 16:00 
+* 13:00 - "Happy hour"
     * [Introduction](404page.html) - nn
     * [Getting data into R](404page.html) - nn
     
@@ -47,14 +47,14 @@ ___
 
 ### Friday, 2018-01-12
 
-* 09:00 - 16:00
-    * [Plotting spatial data](404page.html) - nn
+* 09:00 - "Happy hour"
+    * [Spatial data and ggplot](404page.html) - nn
     * [Reproducible research with R](404page.html) - nn
     * [Case example 1](404page.html) - nn
 
 ### Monday, 2018-01-15
 
-* 09:00 - 12:00 [Working with databases](404page.html) - nn
+* 09:00 - 12:00 [Working with (mfri) databases](404page.html) - nn
 
 ### Tuesday, 2018-01-16
 
@@ -64,14 +64,14 @@ ___
 
 ### Friday, 2018-01-19
 
-* 09:00 - 16:00 
+* 09:00 - "Happy hour"
     * [To be dermined](404page.html)
     * [Next steps](404page.html)
 
 ## Part II
 ___
 
-... to be decided
+... to be announced
 
 
 # Citations
