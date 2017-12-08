@@ -1,0 +1,12 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+knitr::include_graphics("img/404pipe.jpg")
+```
+

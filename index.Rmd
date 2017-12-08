@@ -1,5 +1,5 @@
 ---
-title: "TCRENV - Hafro 2017"
+title: "TCRENV - Hafro 2018"
 author: "Training Course in the R ENVironment"
 output:
   html_document: default
@@ -10,7 +10,7 @@ bibliography: mybib.bib
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### Preamble
+# Preamble
 ___
 
 **Prior to the course** please try to install:
@@ -25,45 +25,56 @@ For those that want to get a head we recommend the following read:
 
   * [R for Data Science](http://r4ds.had.co.nz) [@wickham2016r]
 
-### A draft workplan
+# A draft workplan
 ___
 
-(Definitively a) Preliminary schedule:
+## Part I
+___
 
-#### Friday, 2018-01-05
+### Friday, 2018-01-05
 
 * 13:00 - 16:00 
-    * [Introduction](pre_intro.html) - nn
-    * [Getting data into R](pre_data.html) - nn
+    * [Introduction](404page.html) - nn
+    * [Getting data into R](404page.html) - nn
     
-#### Monday, 2018-01-08
+### Monday, 2018-01-08
 
-* 13:00 - 16:00 [Getting started with ggplot](pre_ggplot1.html) - nn
+* 13:00 - 16:00 [Getting started with ggplot](404page.html) - nn
 
-#### Tuesday, 2018-01-09
+### Tuesday, 2018-01-09
 
-* 09:00 - 12:00 [Getting started with dplyr](pre_dplyr1.html) - nn
+* 09:00 - 12:00 [Getting started with dplyr](404page.html) - nn
 
-#### Friday, 2018-01-12
+### Friday, 2018-01-12
 
 * 09:00 - 16:00
-    * [Plotting spatial data](pre_ggplot2.html) - nn
-    * [Reproducible research with R](pre_markdown.html) - nn
-    * [Case example 1](pre_case_xxx.html) - nn
+    * [Plotting spatial data](404page.html) - nn
+    * [Reproducible research with R](404page.html) - nn
+    * [Case example 1](404page.html) - nn
 
-#### Monday, 2018-01-15
+### Monday, 2018-01-15
 
-* 09:00 - 12:00 [Working with databases](pre_database.html) - nn
+* 09:00 - 12:00 [Working with databases](404page.html) - nn
 
-#### Tuesday, 2018-01-16
+### Tuesday, 2018-01-16
 
 * 09:00 - 12:00
-    * [Working with time](pre_dates.html) - nn
-    * [Working with strings](b_strings.html) - nn
+    * [Working with time](404page.html) - nn
+    * [Working with strings](404page.html) - nn
 
-#### Friday, 2018-01-19
+### Friday, 2018-01-19
 
 * 09:00 - 16:00 
-    * [To be dermined]()
-    * [Next steps]()
+    * [To be dermined](404page.html)
+    * [Next steps](404page.html)
+
+## Part II
+___
+
+... to be decided
+
+
+# Citations
+___
+
 
