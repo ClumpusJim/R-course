@@ -8,7 +8,7 @@ library(grid)
 knitr::opts_chunk$set(warning = FALSE,
                       message = FALSE)
 
-knitr::opts_chunk$set(out.width = '750px', dpi = 200)
+#knitr::opts_chunk$set(out.width = '750px', dpi = 200)
 ```
 
 ```{r, width = 150, echo = FALSE, eval = FALSE}
@@ -20,15 +20,16 @@ TODO: Create exercises
 # Preamble
 ___
 
+
+```{r echo=FALSE}
+include_graphics("img/group_by_summarise.png")
+```
+
 Commonly, when collating summaries by group, one wants to:
 
 * **Split** up a big data structure into homogeneous pieces,
 * **Apply** a function to each piece
 * **Combine** all the results back together.
-
-```{r, width = 150, echo = FALSE, eval = FALSE}
-include_graphics("img/split-apply-combine.png")
-```
 
 For example, one might want to:
 
@@ -77,7 +78,8 @@ ___
 
 ## **filter**: Extract rows that meet logical criteria
 
-```{r, width = 150, echo = FALSE, eval = FALSE}
+
+```{r echo = FALSE}
 include_graphics("img/filter.png")
 ```
 
@@ -136,7 +138,7 @@ filter(d, year == 2007 | (maturity == "mature" & sex == "Male"))
 
 ## **select**: Extract columns by name
 
-```{r,width=150,echo=FALSE, eval = FALSE}
+```{r echo = FALSE}
 include_graphics("img/select.png")
 ```
 
@@ -167,17 +169,22 @@ select(d, id:length, starts_with('stomach'))
 
 `select` also allows you to rename columns as you select them:
 ```{r}
-select(d, id, year.caught = year)
+select(d, id, yr = year)
 ```
 
 but this only selects the requested columns.
 
 ## **rename**: Rename columns
 
+```{r echo = FALSE}
+include_graphics("img/rename.png")
+```
+
+
 If you just want to rename a couple of columns in the data frame leaving the other columns intact you can use the function `rename`:
 
 ```{r}
-rename(d, year.caught = year)
+rename(d, yr = year)
 ```
 
 
@@ -193,7 +200,7 @@ rename(d, year.caught = year)
 
 ## **arrange**: Order rows by values of a column
 
-```{r,width=150,echo=FALSE, eval = FALSE}
+```{r echo=FALSE}
 include_graphics("img/arrange.png")
 ```
 
@@ -214,18 +221,18 @@ arrange(d, sex, desc(stomach.volume))
 
 ## **mutate**: Compute new column
 
-```{r,width=150,echo=FALSE, eval = FALSE}
+```{r echo=FALSE}
 include_graphics("img/mutate.png")
 ```
 
 Mutate allows you to add new columns to your data. Let's calculate the approximate weight
 ```{r}
-mutate(d, computed_weight = 0.00001 * length^3)
+d2 <- select(d, id, length, weight)
+mutate(d2, computed_weight = 0.00001 * length^3)
 ```
 
 You can also do more than one "mutation":
 ```{r}
-d2 <- select(d, id, length, weight)
 mutate(d2,
        computed_weight = 0.00001 * length^3,
        approx_weight = ifelse(is.na(weight), 0.00001 * length^3, weight))
@@ -233,7 +240,7 @@ mutate(d2,
 
 To make our lives a bit easier mutate can "remember" the last result:
 
-```{r}
+```{r, eval = FALSE}
 mutate(d2,
        computed_weight = 0.00001 * length^3,
        approx_weight = ifelse(is.na(weight), computed_weight, weight))
@@ -252,7 +259,7 @@ mutate(d2,
 
 ## **summarise**: create a condensed (summary) table
 
-```{r,width=150,echo=FALSE, eval = FALSE}
+```{r echo=FALSE}
 include_graphics("img/summarise.png")
 ```
 
@@ -265,8 +272,8 @@ summarise(d,
 
 ## **group_by**: created a "grouped" copy of a table
 
-```{r,width=150,echo=FALSE}
-include_graphics("img/group_summarise.png")
+```{r echo=FALSE}
+include_graphics("img/group_by.png")
 ```
 
 The power of the command `summarise` is revealed when used in conjunction with `group_by`. The latter functions splits the data into groups based on one or multiple variables. E.g. one can split the minke table by maturity:
