@@ -1,0 +1,65 @@
+---
+title: "Data transformation II"
+subtitle: "Combine tables"
+---
+
+```{r, echo = FALSE}
+library(knitr)
+library(grid)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE)
+
+#knitr::opts_chunk$set(out.width = '750px', dpi = 200)
+```
+
+# Combine variables
+
+## **left_join**: Join matching values from y to x
+
+```{r echo = FALSE}
+include_graphics("img/left_join.png")
+```
+
+## **right_join**: Join matching values from x to y
+
+```{r echo = FALSE}
+include_graphics("img/right_join.png")
+```
+
+## **inner_join**: Join data. Retain only rows with matches
+
+```{r echo = FALSE}
+include_graphics("img/inner_join.png")
+```
+
+## **full_join**: Join data. Retain all values, all rows
+
+```{r echo = FALSE}
+include_graphics("img/full_join.png")
+```
+
+# Combine cases
+
+## **bind_rows**: Returns tables one on top of the other as a single table.
+
+```{r echo = FALSE}
+include_graphics("img/bind_rows.png")
+```
+
+## **union**: Rows that appear in x or y
+
+```{r echo = FALSE}
+include_graphics("img/union.png")
+```
+
+## **intersect**: Rows that appear in both x and y.
+
+```{r echo = FALSE}
+include_graphics("img/intersect.png")
+```
+
+## **setdiff**: Rows that appear in x but not y
+
+```{r echo = FALSE}
+include_graphics("img/setdiff.png")
+```
