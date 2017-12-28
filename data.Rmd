@@ -1,0 +1,49 @@
+---
+title: "Background on the data used"
+output: 
+  html_document:
+    fig_height: 4
+    fig_width: 8
+    highlight: haddock
+    theme: united
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE)
+```
+
+# Minke dataset
+___
+
+Location: ftp://ftp.hafro.is/pub/tcrenv/minke.csv
+
+The minke whale dataset contains biological measurements from 192 scientific catches of minke whales between the year 2003 and 2007. The data set contains the following fields:
+
+* **whale.id**: Unique identifier for the whale
+* **date.caught**: the date when the whales was caught
+* **lat**: latitude
+* **lon**: longitude
+* **area**: Derived from location (North/South)
+* **length**: length of the whale (cm)
+* **weight**: weight of the whale (kg)
+* **age**: age of the whale (years)
+* **sex**: Male or Female
+* **maturity**: maturity status of the whale
+* **stomach.volume**: volume of the stomach content (liters)
+* **stomach.weight**: weight of the stomach content (kg)
+* **year**: the year when the whale was caught
+
+# Logbook data
+___
+
+## DATRAS data
+___
+
+## Icelandic groundfish survey data
+___
+
+
+

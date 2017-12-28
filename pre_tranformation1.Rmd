@@ -89,7 +89,7 @@ One can extract rows that meet logical criteria by using the `filter` command. T
 filter(d, year == 2005)
 ```
 
-Using subsequent arguements one can refine the subset further:
+Using subsequent arguments one can refine the subset further:
 ```{r}
 filter(d, year == 2005, year <= 2006)
 ```
@@ -109,7 +109,7 @@ Filter takes any logical statement:
  a %in% b ## what elements of column a are also in column b 
 ```
 
-The arguements can operate on different variables. E.g. to extract mature males caught in 2007 one would write:
+The arguments can operate on different variables. E.g. to extract mature males caught in 2007 one would write:
 
 ```{r, eval = FALSE}
 filter(d, maturity == "mature", sex == "Male", year == 2007)
@@ -142,7 +142,7 @@ filter(d, year == 2007 | (maturity == "mature" & sex == "Male"))
 include_graphics("img/select.png")
 ```
 
-The `select` functions allows you to extract certains columns:
+The `select` functions allows you to extract certain columns:
 ```{r}
 select(d, id, year, maturity)
 ```
@@ -311,7 +311,7 @@ arrange(summarise(group_by(d, sex, year), obs = n()), desc(obs))
 
 ## The `%>%` operator
 
-dplyr allows chaining of operators using the `%>%` operator
+dplyr allows chaining of operators using the `%>%` operator - often referred to as the pipe operator.
 
 ```{r}
 d %>% 
@@ -324,21 +324,22 @@ This needs a bit of explaining. Noticed that the first argument in each function
 
 ```{r}
 d %>%
-  mutate(computed_weight = 0.00001 * length^3,
-         weight_approx = ifelse(!is.na(weight), weight, computed_weight),
+  # note - here overwrite the weight column:
+  mutate(weight  = ifelse(!is.na(weight), weight, 0.00001 * length^3),
          K = 100 * weight * 1000 / length^3) %>% 
   group_by(sex, year) %>% 
   summarise(n=n(),
-            ml = mean(length, na.rm = TRUE),
-            sl = sd(length, na.rm = TRUE),
-            mK = mean(K, na.rm = TRUE),
-            sK = sd(K, na.rm = TRUE)) %>% 
+            ml = mean(length),
+            sl = sd(length),
+            mK = mean(K),
+            sK = sd(K)) %>% 
   arrange(year)
 ```
 
-Hadley recomends that you "read" the `%>%` as **"then"**. Hence the above can be read as:
+Hadley recommends that you "read" the `%>%` as **"then"**. Hence the above can be read as:
 
 1. take data d
+2. then calculate the weight if missing and K
 2. then split into groups by sex and year
 3. then calculate the mean and standard deviation of length and K for each group
 4. then arrange by year
