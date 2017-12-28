@@ -10,6 +10,7 @@ bibliography: mybib.bib
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # Preamble
 ___
 
@@ -33,7 +34,7 @@ ___
 
 ### Friday, 2018-01-05
 
-* 13:00 - "Happy hour"
+* 13:00 - 16:00
     * [Introduction](404page.html) - nn
     * [Getting data into R](404page.html) - nn
     
@@ -47,7 +48,7 @@ ___
 
 ### Friday, 2018-01-12
 
-* 09:00 - "Happy hour"
+* 09:00 - 16:00
     * [Spatial data and ggplot](404page.html) - nn
     * [Reproducible research with R](404page.html) - nn
     * [Case example 1](404page.html) - nn
