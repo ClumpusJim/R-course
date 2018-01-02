@@ -3,13 +3,22 @@ title: "Data transformation II"
 ---
 
 ```{r, echo = FALSE}
-library(knitr)
-library(grid)
-knitr::opts_chunk$set(warning = FALSE,
-                      message = FALSE)
-
-#knitr::opts_chunk$set(out.width = '750px', dpi = 200)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+x <- data_frame(A = c("a", "b", "c"),
+                B = c("t", "u", "v"),
+                C = c(1, 2, 3))
+y <- data_frame(A = c("a", "b", "d"),
+                B = c("t", "u", "w"),
+                D = c(3, 2, 1))
+```
+
 
 # Combine variables
 ___
@@ -17,50 +26,94 @@ ___
 ## **left_join**: Join matching values from y to x
 
 ```{r echo = FALSE}
-include_graphics("img/left_join.png")
+knitr::include_graphics("img/left_join.png")
+```
+
+```{r}
+left_join(x, y)
 ```
 
 ## **right_join**: Join matching values from x to y
 
 ```{r echo = FALSE}
-include_graphics("img/right_join.png")
+knitr::include_graphics("img/right_join.png")
+```
+
+```{r}
+left_join(y, x)
 ```
 
 ## **inner_join**: Join data. Retain only rows with matches
 
 ```{r echo = FALSE}
-include_graphics("img/inner_join.png")
+knitr::include_graphics("img/inner_join.png")
 ```
+
+```{r}
+inner_join(x, y)
+```
+
 
 ## **full_join**: Join data. Retain all values, all rows
 
 ```{r echo = FALSE}
-include_graphics("img/full_join.png")
+knitr::include_graphics("img/full_join.png")
+```
+
+```{r}
+full_join(x, y)
 ```
 
 # Combine cases
 ___
 
+```{r}
+y <- data_frame(A = c("c", "d"),
+                B = c("v", "w"),
+                C = c(3, 4))
+```
+
+
 ## **bind_rows**: Returns tables one on top of the other as a single table.
 
 ```{r echo = FALSE}
-include_graphics("img/bind_rows.png")
+knitr::include_graphics("img/bind_rows.png")
+```
+
+```{r}
+bind_rows(x, y)
 ```
 
 ## **union**: Rows that appear in x or y
 
 ```{r echo = FALSE}
-include_graphics("img/union.png")
+knitr::include_graphics("img/union.png")
+```
+
+
+```{r}
+union(x, y)
 ```
 
 ## **intersect**: Rows that appear in both x and y.
 
 ```{r echo = FALSE}
-include_graphics("img/intersect.png")
+knitr::include_graphics("img/intersect.png")
+```
+
+
+```{r}
+intersect(x, y)
 ```
 
 ## **setdiff**: Rows that appear in x but not y
 
 ```{r echo = FALSE}
-include_graphics("img/setdiff.png")
+knitr::include_graphics("img/setdiff.png")
+```
+
+
+```{r}
+setdiff(x, y)
+setdiff(y, x)
 ```
