@@ -1,0 +1,534 @@
+---
+title: "Getting data into R"
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE)
+```
+
+# Preamble
+___
+Load the required packages
+```{r}
+library(tidyverse)
+
+# Statistical software
+library(haven)
+
+# Excel I/O
+library(readxl)
+library(openxlsx)
+
+# for database access
+library(dbplyr)
+library(RSQLite)
+```
+
+Get the datasets and place the datasets in a folder called "data"
+```{r,eval=FALSE}
+dir.create('data')
+download.file("ftp://ftp.hafro.is/pub/tcrenv/minke.csv",
+              destfile = 'data/minke.csv')
+download.file("ftp://ftp.hafro.is/pub/tcrenv/iCod_2017.xlsx",
+              destfile = 'data/example_excel.xlsx',
+              mode = 'wb')
+```
+
+## About the data
+The minke whale dataset contains biological measurements from 192 scientific catches of minke whales between the year 2003 and 2007. The data set contains the following fields:
+
+* **whale.id**: Unique identifier for the whale
+* **date.caught**: the date when the whales was caught
+* **lat**: latitude
+* **lon**: longitude
+* **area**: Derived from location (North/South)
+* **length**: length of the whale
+* **weight**: weight of the whale
+* **age**: age of the whale
+* **sex**: Male or Female
+* **maturity**: maturity status of the whale
+* **stomach.volume**: volume (in liters) of the stomach content
+* **stomach.weight**: weight of the stomach content
+* **year**: the year when the whale was caught
+
+The excel file has two data sets:
+The assessment summary of cod in Icelandic waters from 2017, obtained from http://dt.hafogvatn.is/astand/2017/01_cod.html . The data set contains the following fields:
+
+* **Year** 
+* **Rec** Recruitment as 3-year-olds in millions
+* **SSB**  spawning stock
+* **B4+**  reference biomass
+* **Landings** landings in tonnes
+* **HR** harvest rate (landings/reference biomass)
+* **Fbar** fishing mortality (average for ages 5–10)
+
+The second data set is the No Ballast on Board data set obtained from www.greatlakeslessons.com
+
+# Sources of data 
+___
+![](img/sources.png)
+
+## Reading material
+* http://r4ds.had.co.nz/data-import.html
+
+# Keyboard
+___
+one can simply enter data directly to the console
+```{r}
+weight <- c(1,5,3,2,6)
+length <- c(10,17,14,12,18)
+plot(length,weight)
+```
+
+or if you want a more structured entry one can :
+```{r}
+d <- data_frame(weight = c(1,5,3,2,6),
+                length = c(10,17,14,12,18))
+ggplot(d,aes(length,weight)) + geom_point()
+```
+
+R even has a built data entry window:
+```{r,eval=FALSE}
+dat <- data.frame(id=numeric(0), species=character(0),
+                  length=numeric(0),age=numeric(0),
+                  lat = numeric(0),lon=numeric(0))
+dat <- edit(dat)
+```
+
+but this only creates variable in R that, unless saved, will disappear when R is closed.
+
+### Saving R objects
+
+R has a special file format for saving R objects, such as data frames, called Rdata files. To save an object to a file you can:
+
+```{r,eval=FALSE}
+save(d,file='d.Rdata')
+```
+
+where R saves the d data frame to a file called 'd.Rdata'. You can any number of objects to a file:
+
+```{r,eval=FALSE}
+save(d,length, weight, file = 'someData.Rdata')
+```
+
+If you want to save everything in your workspace you can also do:
+```{r}
+save.image(file='everything.Rdata')
+```
+
+
+# Text files
+___
+Text files are the most basic types of data files and commonly used in all data exchange. Most of the data that we are interested in is in some sort of tabular form and whole host of functions are available to import these files into R. These include the following functions from the `readr` package, included in the `tidyverse` package:
+
+```{r,eval=FALSE}
+read_csv  ## read comma separated files where the decimal is denoted as '.'
+read_csv2 ## read comma separated files where the decimal is denoted as ','
+read_tsv  ## read tab separated files
+read_table ## read white space separated files 
+read_delim ## read files with user specified delimination
+```
+
+These functions all have similar inputs where the settings of the data import can be tweaked:
+```{r,eval=FALSE}
+read_function(file,           ## location of the data file 
+              skip=n,         ## how many lines at the top of the file should be discarded
+              col_names=TRUE, ## should the first line be treated as column names
+              comment = '#',  ## everything after the comment symbol will be ignored
+              n_max=Inf)      ## maximum number of lines to read in
+```
+
+Note that `read_function` is a placeholder name for any of the `read_*` functions. For the most common cases only the file location is needed, which means if your data file is situated in your working directory this is just the name of the file:
+
+```{r,eval=FALSE}
+d <- read_function('nameOfFile.txt')
+```
+
+But files can be stored anywhere on your computer, if the file is in a folder called data within the working directory:
+```{r,eval=FALSE}
+d <- read_function('data/nameOfFile.txt')
+```
+
+If it is the folder that contains your working directory:
+```{r,eval=FALSE}
+d <- read_function('../nameOfFile.txt')
+```
+
+And if it is somewhere on the computer one can use absolute positioning:
+
+```{r,eval=FALSE}
+d <- read_function('~/Path/to/File/nameOfFile.txt')  ## linux/mac
+d <- read_function('c:/Path/to/File/nameOfFile.txt') ## windows
+```
+
+R can even read files on-line:
+
+```{r, eval=FALSE}
+d <- read_function('http://somwhereontheweb.com/nameOfFile.txt')
+```
+
+Now reading in the minke whale dataset, assuming it is located in the working directory in a directory named "data", the data import is simply:
+
+```{r}
+minke <- 
+  read_csv('data/minke.csv')
+```
+
+It is however useful to look at how one would use `read_delim` to import the same data file:
+
+```{r,eval=FALSE}
+minke <-
+  read_delim(file = 'data/minke.csv', ## path to the file
+             col_names = TRUE,        ## are column names
+                                      ## at the top
+             delim = ',',             ## column separator symbol
+             skip = 0,                ## num lines at top to skip
+             comment = '#')           ## indicating comments
+```
+
+
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+* How would you import data where the column separator is "|"
+* You current working directory is "~/Documents/workdir1/" and you want to read a file named "data.csv" in "~/Documents/datadir/". Can you think of two ways to write the file path?
+* Copy the following text to a text file and read in this file using `read_delim`:
+```
+this is some data
+col1 col2 col3 
+1 2 a
+3 4 b
+5 6 c
+```
+
+</div>
+</div>
+
+### Useful sanity checks 
+
+When importing data into R it is fairly useful to have the following in mind
+
+* Does each variable have its own column and each subject it own line?
+* Are there any unnecessary lines or columns?
+* Do the data contain any non-US characters?
+* Are there gaps in the data?
+* Are the results entered consistently?
+* Does every variable have its own name?
+* Are the numbers correctly entered?
+* Are there any items that can cause misunderstanding?
+
+Any of these points can cause trouble when importing the data, in particular when the data has been prepared using Excel. Notably automatic date conversions in Excel is frequently the culprit for many data import issues. After importing is often useful to run a couple of tests on the data to ensure you have read the data in correctly:
+
+The first six rows:
+```{r}
+head(minke)
+```
+
+last six rows
+```{r}
+tail(minke)
+```
+
+How many columns or rows are there in the data
+```{r}
+dim(minke)
+```
+
+What are the names of the column
+```{r}
+names(minke)
+```
+
+Summary statistics for the dataset
+```{r}
+summary(minke)
+```
+
+Structure of the data
+```{r}
+glimpse(minke)
+```
+
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+
+* What is wrong with this file
+```
+a,b,c 
+1,1,bla,bla
+2,2,bingo
+```
+
+* What went wrong with the import?
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+tmp <- read_table('data/minke.csv')
+head(tmp)
+```
+
+</div>
+</div>
+
+
+### Exporting data
+
+R can also export data into formats readable by other software. Among these are:
+```{r,eval=FALSE}
+write_csv   # write a comma separated file
+write_delim # write a file with user defined delimiter
+write_tsv   # write a tab separated file
+write_excel_csv  # write a comma separated file for Excel
+write       # write a line to a file
+```
+
+Most used inputs to these functions are the object to be exported and the file name with the desired location. To export the minke data set as a comma separated file you can simply do:
+
+```{r,eval=FALSE}
+write_csv(minke,path = 'minke.csv')
+```
+
+but with a bit more control
+```{r,eval=FALSE}
+write_delim(minke,
+            path = 'minke-class.csv',  ## file name
+            col_names = TRUE,          ## write header
+            delim = ',')               ## specifiy the delimiter
+
+```
+
+The `write_excel_csv` is nearly identical to `write_csv`, except it adds a hidden character at the top of the file that instructs Excel to read the file with "utf-8" (the universal character encoding).
+
+You can write single lines to a file with the `write` function:
+```{r,eval=FALSE}
+write('Here is some text',file='Afile.txt')
+```
+
+But this becomes more useful when appending the text to an existing file:
+```{r,eval=FALSE}
+write('# comment describing the data', file = 'dataFile.csv')
+write_csv(minke,path = 'dataFile.csv', append = TRUE, col_names = TRUE)
+write('# other comment at the bottom', file = 'dataFile.csv',append = TRUE)
+
+```
+
+Be careful with append, if not properly set the file can be overwritten.
+
+
+# Excel
+___
+### Importing Excel files
+With the readxl package we can read Excel files directly into R with the `read_excel` function:
+```{r,eval=FALSE}
+d <- read_excel(path,               # Path to the excel file
+                sheet = NULL,       # What sheet should be read (either name or number)
+                range = NULL,       # What cells should be read   
+                skip = 0,           # how many lines a the top should be skipped
+                col_names = TRUE,   # is the first line 
+                col_types = 'guess')# what is the type of data in the column
+
+```
+
+
+
+
+In the simplest of cases where the data is well formed we can simply read the data in 
+```{r}
+icod_summary <- read_excel("data/example_excel.xlsx")
+icod_summary
+```
+
+You can also list the sheets in the Excel file
+
+```{r}
+excel_sheets('data/example_excel.xlsx')
+```
+So if the data is in a specific sheet we can specifiy the sheet directly by name or number:
+
+```{r,eval=FALSE}
+# by order
+read_excel("data/example_excel.xlsx", sheet = 1) 
+# by name
+read_excel("data/example_excel.xlsx", sheet = 'iCod_summary') 
+
+```
+Excel file are notoriously free form so often data are mingled in with comments and colors. We can specify the columns and rows where the data are located within the sheet explicity with the range setting of `read_excel`:
+
+```{r}
+d <- read_excel('data/example_excel.xlsx',range = 'A1:D6')
+d
+```
+
+And you can even specify the sheet in the range Excel-style:
+```{r,eval=FALSE}
+d <- read_excel('data/example_excel.xlsx',range = 'iCod_summary!A1:D6')
+```
+
+The `readxl` package provides also a couple of helper functions when specifing the range:
+
+```{r,eval=FALSE}
+anchored      # anchor selction to a specific cell
+cell_cols     # read selected columns
+cell_rows     # read selected roww
+cell_limits   # read selected columns and rows
+```
+
+So you can ask for only the 3rd and the 4th column:
+```{r}
+read_excel('data/example_excel.xlsx',range = cell_cols(3:4))
+```
+
+When importing you can also explicitly define how the columns in your data will be determined using the col_types argument:
+```{r}
+read_excel('data/example_excel.xlsx',col_types = c('text','numeric','numeric','numeric','numeric','numeric','numeric'))
+```
+
+Available column types are: 
+
+guess | numeric
+----- | -------
+text  | logical
+date  | list
+skip  | -
+
+Note that when the data in the cells can't be coerced in the the desired format the cell contents will be replace with `NA`-s.
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+* Use the range attribute to import the tabular data from 'Nobob' sheet in the example_exel file
+* Can you think of a way to ensure that the column are imported as numbers?
+
+</div>
+</div>
+
+
+### Exporting to excel
+
+Another package, `openxlsx`, provides tools to export data to an Excel format. To export a single data frame you can simply write:
+
+```{r,eval=FALSE}
+write.xlsx(minke,file='minke.xlsx')
+```
+
+If you need to export more that one data frame you can use a named list:
+```{r,eval=FALSE}
+write.xlsx(list(minke=minke,iCod=icod_summary),file='RtoExcel.xlsx')
+```
+
+
+# Other statistical software
+___
+Data is often stored in format created by other statistical software packages such a SPSS and SAS. The haven package provides the necessary functions to import and export to these file formats:
+
+```{r,eval=FALSE}
+# SAS
+read_sas    # read sas file
+write_sas   # write sas file
+# SPSS
+read_sav    # read spss file
+write_sav   # write spss file
+
+# Stata
+read_dta    # read stata file
+write_dta   # write stata file
+```
+
+There are a number of SPSS/SAS/Stata features that have no direct equivalent in R. Haven preserves them so you can choose what do with them. To simply eliminate them, use one of the zap functions:
+
+```{r,eval=FALSE}
+as_factor     # Convert input to a factor.
+labelled_spss # Labelled vectors for SPSS
+labelled      # Create a labelled vector.
+is.labelled   # -><- 
+print_labels  # Print the labels of a labelled vector
+
+tagged_na        # "Tagged" missing values
+na_tag  
+is_tagged_na 
+format_tagged_na 
+print_tagged_na
+
+zap_empty     # Convert empty strings into missing values.
+zap_formats   # Remove format attributes
+zap_labels    # Zap labels
+zap_missing   # Zap special missings to regular R missings
+zap_widths    # Remove display width attributes
+```
+
+
+# Database connectivity
+___
+Databases are commonly used to store (large amounts of) data and numerous software vendors provide database solutions, both general and specific
+Similarly numerous packages exist to interact with databases in R. Notably DBI, RODBC and dplyr.
+Typically in an R session the user queries the database for the data needed for a particular analysis and loads it into memory. Larger datasets, that don’t fit into memory will need to be subsampled. The most common types of database engines have a specialised R package:
+
+Engine  | R-package
+------- | ---------
+**Oracle**  | ROracle
+**Postgres**  | RPostgreSQL
+**MSSQL**   | odbc
+**MySQL** | RMySQL
+**sqlite**  | RSQLite
+
+To illustrate how the database connectivity works we will set up a dummy sqlite database containing the minke dataset. The following command creates and sets up a link to a dummy database
+```{r}
+db <- src_sqlite('minke.db',create = TRUE)
+```
+
+It is fairly straightforward to add data to the database. Here the minke whale data is copied to a table called `minke_tbl`
+```{r}
+tmp <- copy_to(db,minke,'minke_tbl')
+```
+
+We can query the database in many ways. If we want everything from the table we use the `tbl` command:
+```{r}
+minke.tbl <- tbl(db,'minke_tbl')
+minke.tbl
+```
+
+You can also run arbitrary sql commands:
+```{r}
+num.minke <- 
+  tbl(db,sql('select count(1) from minke_tbl'))
+num.minke
+```
+
+
+Describe the table
+```{r}
+tbl_vars(minke.tbl)
+minke.tbl  #glimpse(minke.tbl) generates error
+```
+
+List all tables in a database
+```{r
+db_list_tables(db$con)
+```
+
+For information related to database connectivity refer to:
+* https://db.rstudio.com/dplyr/
+
+
+
+# Class excercise
+___
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+Try to open a file from "home"
+
+</div>
+</div>
+
+
+# Further readings
+___
+* http://r4ds.had.co.nz/data-import.html
+* http://readxl.tidyverse.org/
