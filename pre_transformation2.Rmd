@@ -1,6 +1,5 @@
 ---
 title: "Data transformation II"
-subtitle: "Combine tables"
 ---
 
 ```{r, echo = FALSE}
@@ -13,6 +12,7 @@ knitr::opts_chunk$set(warning = FALSE,
 ```
 
 # Combine variables
+___
 
 ## **left_join**: Join matching values from y to x
 
@@ -39,6 +39,7 @@ include_graphics("img/full_join.png")
 ```
 
 # Combine cases
+___
 
 ## **bind_rows**: Returns tables one on top of the other as a single table.
 

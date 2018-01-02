@@ -37,16 +37,18 @@ ___
 ### Friday, 2018-01-05
 
 * 13:00 - 16:00
-    * [Introduction](pre_intro.html) - nn
-    * [Getting data into R](pre_data.html) - nn
+    * [Introduction](pre_intro.html)
+    * [Getting data into R](pre_data.html)
     
 ### Monday, 2018-01-08
 
-* 13:00 - 16:00 [Getting started with ggplot](pre_ggplot1.html) - nn
+* 13:00 - 16:00 [Getting started with ggplot](pre_ggplot1.html)
 
 ### Tuesday, 2018-01-09
 
-* 09:00 - 12:00 [Getting started with dplyr](pre_transformation1.html) - nn
+* 09:00 - 12:00
+    * [Getting started with dplyr](pre_transformation1.html)
+    * [dplyr - combining tables](pre_transformation2.html)
 
 ### Friday, 2018-01-12
 

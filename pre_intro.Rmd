@@ -1,11 +1,5 @@
 ---
 title: "TCRENV 2017 - Introduction"
-output: 
-  html_document:
-    highlight: haddock
-    theme: united
-    toc: yes
-    toc_float: yes
 ---
 
 ```{r setup, include=FALSE}

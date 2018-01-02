@@ -1,19 +1,13 @@
 ---
 title: "Background on the data used"
-output: 
-  html_document:
-    fig_height: 4
-    fig_width: 8
-    highlight: haddock
-    theme: united
-    toc: yes
-    toc_float: yes
 ---
 
 ```{r, echo = FALSE}
 knitr::opts_chunk$set(warning = FALSE,
                       message = FALSE)
 ```
+
+All data are stored at 
 
 # Minke dataset
 ___
@@ -36,13 +30,29 @@ The minke whale dataset contains biological measurements from 192 scientific cat
 * **stomach.weight**: weight of the stomach content (kg)
 * **year**: the year when the whale was caught
 
+# iCod_2017 MS-Excel dataset
+___
+
+Location: ftp://ftp.hafro.is/pub/tcrenv/iCod_2017.xlsx
+
+Assessment summary of cod in Icelandic waters from 2017, obtained from http://dt.hafogvatn.is/astand/2017/01_cod.html . The data set contains the following fields:
+
+* **Year** 
+* **Rec** Recruitment as 3-year-olds in millions
+* **SSB**  spawning stock
+* **B4+**  reference biomass
+* **Landings** landings in tonnes
+* **HR** harvest rate (landings/reference biomass)
+* **Fbar** fishing mortality (average for ages 5–10)
+
+
 # Logbook data
 ___
 
-## DATRAS data
+# DATRAS data
 ___
 
-## Icelandic groundfish survey data
+# Icelandic groundfish survey data
 ___
 
 

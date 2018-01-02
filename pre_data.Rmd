@@ -25,7 +25,7 @@ library(dbplyr)
 library(RSQLite)
 ```
 
-Get the datasets and place the datasets in a folder called "data"
+Get some datasets and place the datasets in a folder called "data" within your project:
 ```{r,eval=FALSE}
 dir.create('data')
 download.file("ftp://ftp.hafro.is/pub/tcrenv/minke.csv",
@@ -35,35 +35,7 @@ download.file("ftp://ftp.hafro.is/pub/tcrenv/iCod_2017.xlsx",
               mode = 'wb')
 ```
 
-## About the data
-The minke whale dataset contains biological measurements from 192 scientific catches of minke whales between the year 2003 and 2007. The data set contains the following fields:
-
-* **whale.id**: Unique identifier for the whale
-* **date.caught**: the date when the whales was caught
-* **lat**: latitude
-* **lon**: longitude
-* **area**: Derived from location (North/South)
-* **length**: length of the whale
-* **weight**: weight of the whale
-* **age**: age of the whale
-* **sex**: Male or Female
-* **maturity**: maturity status of the whale
-* **stomach.volume**: volume (in liters) of the stomach content
-* **stomach.weight**: weight of the stomach content
-* **year**: the year when the whale was caught
-
-The excel file has two data sets:
-The assessment summary of cod in Icelandic waters from 2017, obtained from http://dt.hafogvatn.is/astand/2017/01_cod.html . The data set contains the following fields:
-
-* **Year** 
-* **Rec** Recruitment as 3-year-olds in millions
-* **SSB**  spawning stock
-* **B4+**  reference biomass
-* **Landings** landings in tonnes
-* **HR** harvest rate (landings/reference biomass)
-* **Fbar** fishing mortality (average for ages 5–10)
-
-The second data set is the No Ballast on Board data set obtained from www.greatlakeslessons.com
+Information on these datasets can be found [here](data.html).
 
 # Sources of data 
 ___
