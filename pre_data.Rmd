@@ -326,7 +326,6 @@ So if the data is in a specific sheet we can specifiy the sheet directly by name
 read_excel("data/example_excel.xlsx", sheet = 1) 
 # by name
 read_excel("data/example_excel.xlsx", sheet = 'iCod_summary') 
-
 ```
 Excel file are notoriously free form so often data are mingled in with comments and colors. We can specify the columns and rows where the data are located within the sheet explicity with the range setting of `read_excel`:
 

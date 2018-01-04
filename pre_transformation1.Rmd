@@ -33,8 +33,8 @@ Commonly, when collating summaries by group, one wants to:
 
 For example, one might want to:
 
-* Calculate summary statistics for each category
-* Perform group-wise transformations like scaling or standardizing
+* Calculate summary statistics for each category (read: group)
+* Perform group-wise transformations (read: apply) like summary or re-scaling/standardization
 * Fit the same model to different subset of the data
 
 The tidyverse packages, through the dplyr and tidyr, offer a set of tools for a common set of problems connected to aggregates or summaries of data.
@@ -54,9 +54,10 @@ Essentially dplyr and tidyr offer a collection of simple but powerful commands (
 The structure of these commands is always the same:
 
 * First argument to the function is a data frame
-* Always return a data frame
 * Subsequent arguments say what to do with data frame
-* (Never modify in place)
+* Always return a data frame
+    * this is the **key** difference of the tidyverse vs. base R approach
+    * (Never modify in place) - EH: what does this mean???
 * It recognizes the columns of the data.frame as variables, that is only need to write `col.name` instead of `dat$col.name`
 
 #### Reading material 
@@ -83,15 +84,39 @@ ___
 include_graphics("img/filter.png")
 ```
 
-One can extract rows that meet logical criteria by using the `filter` command. The first argument is the name of the data frame with subsequent argument(s) being logical expressions. E.g. one subset the minke data containing only data from 2005 by:
+One can extract rows that meet logical criteria by using the `filter` command. The first argument is the name of the data frame with subsequent argument(s) being logical expressions. E.g. one subset the minke data containing only data from 2005 and later by:
 
 ```{r}
-filter(d, year == 2005)
+filter(d, year >= 2005)
 ```
 
 Using subsequent arguments one can refine the subset further:
 ```{r}
-filter(d, year == 2005, year <= 2006)
+filter(d, year >=2005, year < 2006)
+```
+
+Which is the same as doing:
+```{r, eval = FALSE}
+# not run
+filter(d, year == 2005)
+```
+
+All but the year 2005 would be:
+```{r, eval = FALSE}
+# not run
+filter(d, year != 2005)
+```
+
+But this would give year 2005 to 2007:
+```{r, eval = FALSE}
+# not run
+filter(d, year %in% c(2005, 2007))
+```
+
+Which would be the same as:
+```{r, eval = FALSE}
+# not run
+filter(d, year == 2005 | year == 2007)
 ```
 
 Filter takes any logical statement:
@@ -112,12 +137,14 @@ Filter takes any logical statement:
 The arguments can operate on different variables. E.g. to extract mature males caught in 2007 one would write:
 
 ```{r, eval = FALSE}
+# not run
 filter(d, maturity == "mature", sex == "Male", year == 2007)
 ```
 
 A "comma" is recognized as "AND". If one were to specify "OR" use the "|":
 
 ```{r, eval = FALSE}
+# not run
 filter(d, maturity == "mature" | sex == "Male" | year == 2007)
 ```
 
