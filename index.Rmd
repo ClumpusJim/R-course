@@ -14,12 +14,20 @@ knitr::opts_chunk$set(echo = TRUE)
 # Preamble
 ___
 
-The course material is in the making on [github.com](https://github.com/fishvice/tcrenv)
+### The course material
+
+The course material is open source, meaning that the source code is made freely available and may be redistributed and modified.
+
+* The source code for the course material is located at: https://github.com/fishvice/tcrenv
+* The course product is rendered at: http://www.hafro.is/~einarhj/tcrenv
+
+### Your a priori homework
 
 **Prior to the course** please try to install:
 
 * Latest version of __R__: see [The Comprehensive R Archive Network](https://cran.r-project.org/)
     * If your platform is Windows, also install [Rtools](https://cran.r-project.org/bin/windows/Rtools)
+   * If your platform is Mac, install **XCode** via AppStore.
 
 * Latest version of __RStudio__: see [RStudio Desktop](https://www.rstudio.com/products/rstudio/download/)
     * If you are adventurous install the latest [developmental version](https://www.rstudio.com/products/rstudio/download/preview)

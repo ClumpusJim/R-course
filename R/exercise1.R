@@ -15,6 +15,13 @@ log10(5)             # base 10 log of 5
 # Get help on functions --------------------------------------------------------
 ?log
 
+# Often there are more detail information on packages usage. To get information
+#  on all the vignettes available do:
+browseVignettes()
+# or a specific vignette:
+browseVignettes("readr")
+
+
 # Data types -------------------------------------------------------------------
 class(1.2)           # number
 class("A")           # string
@@ -33,6 +40,8 @@ c(1:10)              # same
 length(1:10)         # length of a vector
 sort(10:0)           # sorts a vector into ascending
 rep(2, 3)            # makes a vector that contains 2, 3 times
+seq(1, 10, by = 1)   # same as c(1:10)
+seq(10, 100, by = 10) # by controls the increment
 
 # transforming vectors ---------------------------------------------------------
 x <- 1:10
@@ -44,7 +53,7 @@ x^2
 log(x)
 
 # Subsetting: selecting parts of vectors ---------------------------------------
-x <- c(1:10)
+x <- seq(10, 100, by = 10)
 x[1]                 # get the first element of a vector
 x[c(1, 2)]           # get the first and second element
 x[-1]                # get every element except the first one
@@ -61,15 +70,25 @@ a < b                # a is less than b
 a <= b               # a is less or equal to b
 a & b                # a and b
 a | b                # a or b
+# more reasonable example
+c <- 10
+a > b & a == c       # is a greater than b and a equal to c
+a > b & a != c       # is a greater than b and a equal to c
 is.na(a)             # is a equal to NA (missing)
 
 # Selecting parts of vectors using logical statements --------------------------
-x <- c(1:10)
+x <- c(1:10, NA)
 x < 3
 x[x < 3]
 x[x != 3 & x < 5]    # all elements that not equal to 3 and <5
 x[is.na(x)]          # all elements that are NA
 x[!is.na(x)]         # all elements that are not NA
+
+# can use the logical condition to change variables in a vector
+#  here replace the values that fit a certain arguemnt with another value
+x[is.na(x)] <- -1
+x
+
 
 # Summary statistics
 x <- rnorm(n = 50, mean = 20, sd = 4)
@@ -78,6 +97,7 @@ x
 mean(x)       # mean
 median(x)     # median
 quantile(x)   # quantiles
+quantile(x, 0.42)  # 42nd percentile
 summary(x)    # depends on what we feed it with...
 sd(x)         # standard deviation
 var(x)        # variance
@@ -114,6 +134,10 @@ dim(d)            # number of rows and number of columns
 nrow(d)           # number of rows
 ncol(d)           # number of columns
 str(d)            # structure of any object, here the dataframe
+
+# type of the columns
+class(d$y)        # class of the vector y in dataframe d
+class(d$z)        # class of the vector z in dataframe d
 
 # General information & orientataion -------------------------------------------
 getwd()           # where is my working directory?

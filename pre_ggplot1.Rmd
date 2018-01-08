@@ -13,19 +13,13 @@ ___
 #### Needed libraries for this tutorial:
 ```{r, message = FALSE, warning = FALSE, results='hide'}
 library(tidyverse)
-library(readr)
-theme_set(theme_grey(base_size = 16))
+theme_set(theme_grey(base_size = 16))  # larger text base size (default is 12)
 ```
 
 #### Getting example data into R
 ```{r}
-d <- read.csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv")
-# "better" to use read_csv, because it reads in dates
-# and
 d <- read_csv("data/minke.csv")
-glimpse(d)
 ```
-
 
 # ggplot: Key components
 ___
@@ -95,6 +89,13 @@ p + geom_point(aes(colour = sex)) +
 p + geom_point(aes(colour = area)) +
   scale_colour_brewer(palette = "Set1")
 ```
+
+Note, to view all the brewer palettes do:
+```{r, eval = FALSE}
+RColorBrewer::display.brewer.all()
+```
+
+
 
 ### shape
 
@@ -311,11 +312,11 @@ ___
 
 ```{r}
 p <- ggplot(d, aes(age, length, colour = sex)) + geom_point()
-p <- p + labs(x = "Age [year]", y = "Length [cm]", 
+p + labs(x = "Age [year]", y = "Length [cm]", 
          colour = "Sex", 
          title = "My minke plot",
-         subtitle = "My nice subtitle")
-p
+         subtitle = "My nice subtitle",
+         caption = "My caption")
 ```
 
 ### Legend position
@@ -367,12 +368,16 @@ Remedy:
 p + geom_boxplot() + coord_cartesian(ylim = c(600, 800))
 ```
 
+
+
 # Further readings
 ___
 
-* The ggplot2 site: http://docs.ggplot2.org/current
+* The ggplot2 site: http://ggplot2.tidyverse.org
 * The ggplot2 book in the making: https://github.com/hadley/ggplot2-book
     - A rendered version of the book: http://www.hafro.is/~einarhj/education/ggplot2
         - needs to be updates
+* [R4DS - Data visualisation](http://r4ds.had.co.nz/data-visualisation.html)
 * R graphics cookbook: http://www.cookbook-r.com/Graphs
+* [Data Visualization Cheat Sheet](https://github.com/rstudio/cheatsheets/raw/master/data-visualization-2.1.pdf)
 

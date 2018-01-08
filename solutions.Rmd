@@ -1,0 +1,94 @@
+---
+title: "Solutions"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r, echo = FALSE}
+library(tidyverse)
+```
+
+# Getting data into R
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise 1</div>
+<div class="panel-body">
+
+1. How would you import data where the column separator is "|"
+
+```{r, eval = FALSE}
+read_delim(file = "filename",
+           delim = "|")
+```
+
+
+2. You current working directory is "~/Documents/workdir1/" and you want to read a file named "data.csv" in "~/Documents/datadir/". Can you think of two ways to write the file path?
+
+```{r, eval = FALSE}
+read_csv(file = "~/Documents/datadir/data.csv")
+read_csv(file = "../datadir/data.csv")
+```
+
+
+3. Copy the following text to a text file and read in this file using `read_delim`:
+```
+this is some data
+col1 col2 col3
+1 2 a
+3 4 b
+5 6 c
+```
+
+```{r, eval = FALSE}
+read_delim("this is some data
+col1 col2 col3
+1 2 a
+3 4 b
+5 6 c",
+delim = " ",
+skip = 1)
+```
+
+
+</div>
+</div>
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise 2</div>
+<div class="panel-body">
+
+
+1. What is wrong with this file
+```
+a,b,c 
+1,1,bla,bla
+2,2,bingo
+```
+Second line has four variables but column names (1st line) and variables in line 3 are only three.
+
+Hence we get:
+```{r}
+read_csv("a,b,c 
+1,1,bla,bla
+2,2,bingo")
+```
+
+
+
+
+2. What went wrong with the import?
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+tmp <- read_table('data/minke.csv')
+head(tmp)
+```
+
+```{r, eval = FALSE}
+tmp <- read_table('data/minke.csv')
+head(tmp)
+```
+
+</div>
+</div>
+

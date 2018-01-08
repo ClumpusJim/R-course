@@ -25,17 +25,12 @@ library(dbplyr)
 library(RSQLite)
 ```
 
-Get some datasets and place the datasets in a folder called "data" within your project:
-```{r,eval=FALSE}
-dir.create('data')
-download.file("ftp://ftp.hafro.is/pub/tcrenv/minke.csv",
-              destfile = 'data/minke.csv')
-download.file("ftp://ftp.hafro.is/pub/tcrenv/iCod_2017.xlsx",
-              destfile = 'data/example_excel.xlsx',
-              mode = 'wb')
+Note if you do not have a package installed use `install.packages´, e.g.:
+```{r, eval = FALSE}
+install.packages("openxlsx")
+install.packages("RSQLite")
 ```
 
-Information on these datasets can be found [here](data.html).
 
 # Sources of data 
 ___
@@ -96,7 +91,7 @@ Text files are the most basic types of data files and commonly used in all data 
 
 ```{r,eval=FALSE}
 read_csv  ## read comma separated files where the decimal is denoted as '.'
-read_csv2 ## read comma separated files where the decimal is denoted as ','
+read_csv2 ## read semicolon separated files where the decimal is denoted as ','
 read_tsv  ## read tab separated files
 read_table ## read white space separated files 
 read_delim ## read files with user specified delimination
@@ -140,11 +135,29 @@ R can even read files on-line:
 d <- read_function('http://somwhereontheweb.com/nameOfFile.txt')
 ```
 
-Now reading in the minke whale dataset, assuming it is located in the working directory in a directory named "data", the data import is simply:
+**Downloading files**: Before proceeding lets download some files on our computer. Here we get some datasets and place the datasets in a folder called "data" within your project:
+
+```{r,eval=FALSE}
+dir.create('data')
+download.file("ftp://ftp.hafro.is/pub/tcrenv/minke.csv",
+              destfile = 'data/minke.csv')
+download.file("ftp://ftp.hafro.is/pub/tcrenv/iCod_2017.xlsx",
+              destfile = 'data/example_excel.xlsx',
+              mode = 'wb')
+```
+
+Information on these datasets can be found [here](data.html).
+
+Now reading in the minke whale dataset into R is simply:
 
 ```{r}
 minke <- 
   read_csv('data/minke.csv')
+```
+
+We could also have read this directly from the web:
+```{r, eval = FALSE}
+minke <- read_csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv")
 ```
 
 It is however useful to look at how one would use `read_delim` to import the same data file:
@@ -159,18 +172,16 @@ minke <-
              comment = '#')           ## indicating comments
 ```
 
-
-
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Exercise 1</div>
 <div class="panel-body">
 
-* How would you import data where the column separator is "|"
-* You current working directory is "~/Documents/workdir1/" and you want to read a file named "data.csv" in "~/Documents/datadir/". Can you think of two ways to write the file path?
-* Copy the following text to a text file and read in this file using `read_delim`:
+1. How would you import data where the column separator is "|"
+2. You current working directory is "~/Documents/workdir1/" and you want to read a file named "data.csv" in "~/Documents/datadir/". Can you think of two ways to write the file path?
+3. Copy the following text to a text file and read in this file using `read_delim`:
 ```
 this is some data
-col1 col2 col3 
+col1 col2 col3
 1 2 a
 3 4 b
 5 6 c
@@ -226,18 +237,18 @@ glimpse(minke)
 
 
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Exercise 2</div>
 <div class="panel-body">
 
 
-* What is wrong with this file
+1. What is wrong with this file
 ```
 a,b,c 
 1,1,bla,bla
 2,2,bingo
 ```
 
-* What went wrong with the import?
+2. What went wrong with the import?
 ```{r,echo=FALSE, message=FALSE, warning=FALSE}
 tmp <- read_table('data/minke.csv')
 head(tmp)
@@ -261,7 +272,7 @@ write       # write a line to a file
 Most used inputs to these functions are the object to be exported and the file name with the desired location. To export the minke data set as a comma separated file you can simply do:
 
 ```{r,eval=FALSE}
-write_csv(minke,path = 'minke.csv')
+write_csv(minke, path = 'minke.csv')
 ```
 
 but with a bit more control
@@ -277,7 +288,7 @@ The `write_excel_csv` is nearly identical to `write_csv`, except it adds a hidde
 
 You can write single lines to a file with the `write` function:
 ```{r,eval=FALSE}
-write('Here is some text',file='Afile.txt')
+write('Here is some text', file = 'Afile.txt')
 ```
 
 But this becomes more useful when appending the text to an existing file:
@@ -293,7 +304,9 @@ Be careful with append, if not properly set the file can be overwritten.
 
 # Excel
 ___
+
 ### Importing Excel files
+
 With the readxl package we can read Excel files directly into R with the `read_excel` function:
 ```{r,eval=FALSE}
 d <- read_excel(path,               # Path to the excel file
@@ -304,9 +317,6 @@ d <- read_excel(path,               # Path to the excel file
                 col_types = 'guess')# what is the type of data in the column
 
 ```
-
-
-
 
 In the simplest of cases where the data is well formed we can simply read the data in 
 ```{r}
@@ -321,16 +331,17 @@ excel_sheets('data/example_excel.xlsx')
 ```
 So if the data is in a specific sheet we can specifiy the sheet directly by name or number:
 
-```{r,eval=FALSE}
+```{r, eval=FALSE}
 # by order
 read_excel("data/example_excel.xlsx", sheet = 1) 
 # by name
 read_excel("data/example_excel.xlsx", sheet = 'iCod_summary') 
 ```
-Excel file are notoriously free form so often data are mingled in with comments and colors. We can specify the columns and rows where the data are located within the sheet explicity with the range setting of `read_excel`:
+
+Excel files are notoriously free form so often data are mingled in with comments and colors. We can specify the columns and rows where the data are located within the sheet explicity with the range setting of `read_excel`:
 
 ```{r}
-d <- read_excel('data/example_excel.xlsx',range = 'A1:D6')
+d <- read_excel('data/example_excel.xlsx', range = 'A1:D6')
 d
 ```
 
@@ -369,11 +380,11 @@ skip  | -
 Note that when the data in the cells can't be coerced in the the desired format the cell contents will be replace with `NA`-s.
 
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Exercise 3</div>
 <div class="panel-body">
 
-* Use the range attribute to import the tabular data from 'Nobob' sheet in the example_exel file
-* Can you think of a way to ensure that the column are imported as numbers?
+1. Use the range attribute to import the tabular data from 'Nobob' sheet in the example_exel file
+2. Can you think of a way to ensure that the column are imported as numbers?
 
 </div>
 </div>
@@ -384,12 +395,12 @@ Note that when the data in the cells can't be coerced in the the desired format 
 Another package, `openxlsx`, provides tools to export data to an Excel format. To export a single data frame you can simply write:
 
 ```{r,eval=FALSE}
-write.xlsx(minke,file='minke.xlsx')
+write.xlsx(minke, file = 'minke.xlsx')
 ```
 
 If you need to export more that one data frame you can use a named list:
 ```{r,eval=FALSE}
-write.xlsx(list(minke=minke,iCod=icod_summary),file='RtoExcel.xlsx')
+write.xlsx(list(minke=minke, iCod=icod_summary), file = 'RtoExcel.xlsx')
 ```
 
 
@@ -486,11 +497,9 @@ For information related to database connectivity refer to:
 * https://db.rstudio.com/dplyr/
 
 
-
-# Class excercise
 ___
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Exercise 4</div>
 <div class="panel-body">
 
 Try to open a file from "home"
