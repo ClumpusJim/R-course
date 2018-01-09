@@ -45,29 +45,31 @@ ___
 ### Friday, 2018-01-05
 
 * 13:00 - 16:00
-    * [Introduction](pre_intro.html)
-    * [Getting data into R](pre_data.html)
+    * [Introduction](pre_intro.html) - bte
+    * [Getting data into R](pre_data.html) - bte
     
 ### Monday, 2018-01-08
 
-* 13:00 - 16:00 [Getting started with ggplot](pre_ggplot1.html)
+* 13:00 - 16:00 [Getting started with ggplot](pre_ggplot1.html) - eh
 
 ### Tuesday, 2018-01-09
 
 * 09:00 - 12:00
-    * [Getting started with dplyr](pre_transformation1.html)
-    * [dplyr - combining tables](pre_transformation2.html)
+    * [Getting started with dplyr](pre_transformation1.html) - eh
+    * [dplyr - combining tables](pre_transformation2.html) - eh
 
 ### Friday, 2018-01-12
 
-* 09:00 - 16:00
-    * [Spatial data and ggplot](404page.html) - nn
-    * [Reproducible research with R](404page.html) - nn
-    * [Case example 1](404page.html) - nn
+* 09:00 - 12:00
+    * [Working with (mfri) databases and introduction to the mar-package](404page.html) - bte
+* 13:00 - 16:00
+    * [Spatial data and ggplot](404page.html) - eh
 
 ### Monday, 2018-01-15
 
-* 09:00 - 12:00 [Working with (mfri) databases](404page.html) - nn
+* 09:00 - 12:00
+    * [Reproducible research with R](404page.html) -nn
+    * [Case example 1](404page.html) - nn
 
 ### Tuesday, 2018-01-16
 
@@ -77,15 +79,24 @@ ___
 
 ### Friday, 2018-01-19
 
-* 09:00 - "Happy hour"
+* 13:00 - "Happy hour"
     * [To be dermined](404page.html)
     * [Next steps](404page.html)
 
 ## Part II
 ___
 
-... to be announced
+... to be announced, "data call" to be made, instructors to be found.
 
+So far, informal discussion have resulted in having introduction to the following topics:
+
+* [Geocomputation with R](404page.html) - nn
+* [Creating Websites with R Markdown](404page.html) - nn
+
+
+## Addendums
+
+* [Bits and pieces](bits_and_pieces.html) - collection of code made in response to the lectures.
 
 # Citations
 ___

@@ -15,8 +15,6 @@ knitr::opts_chunk$set(warning = FALSE,
 include_graphics("img/data_science.png")
 ```
 
-TODO: Create exercises
-
 # Preamble
 ___
 
@@ -37,12 +35,12 @@ For example, one might want to:
 * Perform group-wise transformations (read: apply) like summary or re-scaling/standardization
 * Fit the same model to different subset of the data
 
-The tidyverse packages, through the dplyr and tidyr, offer a set of tools for a common set of problems connected to aggregates or summaries of data.
+The tidyverse package, through the dplyr, comes to the rescue.
 
 * Similar to ggplot2 they feature a Domain Specific Language (DSL) specially designed for data summaries.
 * Developed by Hadley Wickam, the creator ggplot2 and other useful tools.
 
-Essentially dplyr and tidyr offer a collection of simple but powerful commands (or verbs) that facilitate this split-apply-combined process:
+Essentially dplyr offer a collection of simple but powerful commands (or verbs) that facilitate this split-apply-combined process:
 
 * **filter**: keep rows matching criteria
 * **select**: pick columns by name
@@ -57,7 +55,6 @@ The structure of these commands is always the same:
 * Subsequent arguments say what to do with data frame
 * Always return a data frame
     * this is the **key** difference of the tidyverse vs. base R approach
-    * (Never modify in place) - EH: what does this mean???
 * It recognizes the columns of the data.frame as variables, that is only need to write `col.name` instead of `dat$col.name`
 
 #### Reading material 
@@ -77,46 +74,42 @@ glimpse(d)
 # Manipulate Cases
 ___
 
-## **filter**: Extract rows that meet logical criteria
+## **filter**: Extract rows
 
 
 ```{r echo = FALSE}
 include_graphics("img/filter.png")
 ```
 
-One can extract rows that meet logical criteria by using the `filter` command. The first argument is the name of the data frame with subsequent argument(s) being logical expressions. E.g. one subset the minke data containing only data from 2005 and later by:
+One can extract rows that meet logical criteria by using the `filter` command. The first argument is the name of the data frame with subsequent argument(s) being logical expressions. E.g. one subset the minke data containing only data from 2004 and later by:
 
 ```{r}
-filter(d, year >= 2005)
+filter(d, year >= 2004)
 ```
 
 Using subsequent arguments one can refine the subset further:
 ```{r}
-filter(d, year >=2005, year < 2006)
+filter(d, year >=2004, year < 2006)
 ```
 
 Which is the same as doing:
 ```{r, eval = FALSE}
-# not run
-filter(d, year == 2005)
+filter(d, year %in% c(2004, 2005))
 ```
 
-All but the year 2005 would be:
+All but the year 2004 would be:
 ```{r, eval = FALSE}
-# not run
-filter(d, year != 2005)
+filter(d, year != 2004)
 ```
 
 But this would give year 2005 to 2007:
 ```{r, eval = FALSE}
-# not run
-filter(d, year %in% c(2005, 2007))
+filter(d, year %in% 2005:2007)
 ```
 
 Which would be the same as:
 ```{r, eval = FALSE}
-# not run
-filter(d, year == 2005 | year == 2007)
+filter(d, !year %in% 2003:2004)
 ```
 
 Filter takes any logical statement:
@@ -131,20 +124,18 @@ Filter takes any logical statement:
  a | b    ## a or b
  !a       ## not a
  is.na(a) ## is a equal to NA (missing)
- a %in% b ## what elements of column a are also in column b 
+# ...
 ```
 
 The arguments can operate on different variables. E.g. to extract mature males caught in 2007 one would write:
 
 ```{r, eval = FALSE}
-# not run
 filter(d, maturity == "mature", sex == "Male", year == 2007)
 ```
 
-A "comma" is recognized as "AND". If one were to specify "OR" use the "|":
+NOTE: A "comma" is recognized as "AND". If one were to specify "OR" use the "|":
 
 ```{r, eval = FALSE}
-# not run
 filter(d, maturity == "mature" | sex == "Male" | year == 2007)
 ```
 
@@ -153,8 +144,9 @@ filter(d, maturity == "mature" | sex == "Male" | year == 2007)
 <div class="panel-body">
 
 * Find all males caught in the northern area in 2006 and 2007
-* Find all minke whales caught that did not have a maturity status
-* Find all minke whales that were caught in year 2007 or were mature males
+* Find all males that are either immature or pregnant
+* Find all whales caught that did not have a maturity status determined
+* Find all whales that were caught in year 2007 or were mature males
 
 ```{r, echo = FALSE, eval = FALSE}
 filter(d, year == 2007 | (maturity == "mature" & sex == "Male"))
@@ -163,7 +155,7 @@ filter(d, year == 2007 | (maturity == "mature" & sex == "Male"))
 </div>
 </div>
 
-## **select**: Extract columns by name
+## **select**: Extract columns
 
 ```{r echo = FALSE}
 include_graphics("img/select.png")
@@ -177,6 +169,11 @@ select(d, id, year, maturity)
 You can also omit certain columns using negative indexing: for example you can select all columns except `length`:
 ```{r}
 select(d, -length)
+```
+
+A combination of negative indexes could be written as:
+```{r, eval = FALSE}
+select(d, -c(weight, maturity))
 ```
 
 The `select` function can use a couple of fairly useful helper function:
@@ -220,12 +217,12 @@ rename(d, yr = year)
 <div class="panel-body">
 
 * Select age, length and id from the minke dataset, and rename id to "whale_id"
-* Select the weight columns using the `contains` function
+* Select the id column and all columns that contain the text "weight".
 
 </div>
 </div>
 
-## **arrange**: Order rows by values of a column
+## **arrange**: Order rows
 
 ```{r echo=FALSE}
 include_graphics("img/arrange.png")
@@ -265,7 +262,7 @@ mutate(d2,
        approx_weight = ifelse(is.na(weight), 0.00001 * length^3, weight))
 ```
 
-To make our lives a bit easier mutate can "remember" the last result:
+To make our lives a bit easier mutate "remembers" earlier transformations within the mutate sequence:
 
 ```{r, eval = FALSE}
 mutate(d2,
@@ -284,7 +281,7 @@ mutate(d2,
 
 # Summarise cases
 
-## **summarise**: create a condensed (summary) table
+## **summarise**:
 
 ```{r echo=FALSE}
 include_graphics("img/summarise.png")
@@ -297,7 +294,7 @@ summarise(d,
           ml = mean(length, na.rm = TRUE))
 ```
 
-## **group_by**: created a "grouped" copy of a table
+## **group_by**:
 
 ```{r echo=FALSE}
 include_graphics("img/group_by.png")
@@ -313,15 +310,22 @@ by_maturity
 
 The table appears "intact" because it still has 190 observations but it has 6 groups, representing the different values of the maturity scaling in the data (anoestrous, immature, mature, pregnant, pubertal and "NA").
 
-The `summarise`-command respects the grouping, as shown if one uses the same command as used above:
+The `summarise`-command respects the grouping, as shown if one uses the same command as used above, but now on a dataframe that has been grouped:
 ```{r}
 summarise(by_maturity,
           n.obs = n(),
-          ml = mean(length, na.rm = TRUE))
+          mean = mean(length, na.rm = TRUE))
 ```
 
-EXERCISE ???
 
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+* Calculate the minimum, median, mean, standard deviation and standard error of whale lengths in each year
+
+</div>
+</div>
 # Combining verbs
 ___
 
@@ -379,44 +383,12 @@ Note that Rstudio has a built in shortcut for the `%>%` operator, [ctrl] + [shif
 <div class="panel-body">
 
 
-* How do you produce this table:
-```{r,echo=FALSE}
-d %>%
-  mutate(computed_weight = 0.00001*length^3,
-         weight_approx = ifelse(!is.na(weight),weight,computed_weight),
-         K = 100*weight*1000/length^3) %>% 
-  group_by(sex,maturity) %>% 
-  summarise(n=n()) %>% 
-  spread(sex,n)
+* How do you produce this table, the statistics being based on length?:
+```{r, echo = FALSE}
+read_csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv") %>% 
+  group_by(sex, area) %>% 
+  summarise(standard.error = sd(length) / sqrt(n()))
 ```
-
-</div>
-</div>
-
-
-
-
-
-
-
-
-
-Useful helper function
-```{r,eval=FALSE}
-n()             ## counts the number of rows
-n_distinct(x)   ## counts the number distinct values of x
-first(x)        ## first value of x
-last(x)         ## last value of x
-nth(x,n)        ## nth value of x  
-```
-
-
-<div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
-<div class="panel-body">
-
-* How many females were caught in the Northern area
-* Calculate the mean stomach volume and standard deviation of all whales caught
 
 </div>
 </div>

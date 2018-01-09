@@ -3,121 +3,107 @@ title: "Data transformation II"
 ---
 
 ```{r, echo = FALSE}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
-```{r}
+```{r, echo = FALSE}
 library(tidyverse)
 ```
 
-```{r}
+# Combine variables (join)
+___
+
+## **left_join**: Matching values from y to x
+
+```{r echo = FALSE}
+knitr::include_graphics("img/left_join.png")
+```
+
+## **right_join**: Matching values from x to y
+
+```{r echo = FALSE}
+knitr::include_graphics("img/right_join.png")
+```
+
+## **inner_join**: Retain only rows with matches
+
+```{r echo = FALSE}
+knitr::include_graphics("img/inner_join.png")
+```
+
+## **full_join**: Retain all rows
+
+```{r echo = FALSE}
+knitr::include_graphics("img/full_join.png")
+```
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise 1</div>
+<div class="panel-body">
+
+Create dataframe x and y as above and code that mimics the results depicted in the diagrams.
+
+```{r, eval = FALSE}
 x <- data_frame(A = c("a", "b", "c"),
                 B = c("t", "u", "v"),
                 C = c(1, 2, 3))
 y <- data_frame(A = c("a", "b", "d"),
                 B = c("t", "u", "w"),
                 D = c(3, 2, 1))
-```
 
-
-# Combine variables
-___
-
-## **left_join**: Join matching values from y to x
-
-```{r echo = FALSE}
-knitr::include_graphics("img/left_join.png")
-```
-
-```{r}
 left_join(x, y)
-```
-
-## **right_join**: Join matching values from x to y
-
-```{r echo = FALSE}
-knitr::include_graphics("img/right_join.png")
-```
-
-```{r}
+right_join(x, y)
 left_join(y, x)
-```
-
-## **inner_join**: Join data. Retain only rows with matches
-
-```{r echo = FALSE}
-knitr::include_graphics("img/inner_join.png")
-```
-
-```{r}
 inner_join(x, y)
-```
-
-
-## **full_join**: Join data. Retain all values, all rows
-
-```{r echo = FALSE}
-knitr::include_graphics("img/full_join.png")
-```
-
-```{r}
 full_join(x, y)
 ```
+</div>
+</div>
 
-# Combine cases
+# Combine cases (bind)
 ___
 
-```{r}
-y <- data_frame(A = c("c", "d"),
-                B = c("v", "w"),
-                C = c(3, 4))
-```
 
-
-## **bind_rows**: Returns tables one on top of the other as a single table.
+## **bind_rows**: One on top of the other as a single table.
 
 ```{r echo = FALSE}
 knitr::include_graphics("img/bind_rows.png")
 ```
 
-```{r}
-bind_rows(x, y)
-```
-
-## **union**: Rows that appear in x or y
+## **union**: Rows in x **or** y
 
 ```{r echo = FALSE}
 knitr::include_graphics("img/union.png")
 ```
 
-
-```{r}
-union(x, y)
-```
-
-## **intersect**: Rows that appear in both x and y.
+## **intersect**: Rows in x **and** y.
 
 ```{r echo = FALSE}
 knitr::include_graphics("img/intersect.png")
 ```
 
-
-```{r}
-intersect(x, y)
-```
-
-## **setdiff**: Rows that appear in x but not y
+## **setdiff**: Rows in x but not y
 
 ```{r echo = FALSE}
 knitr::include_graphics("img/setdiff.png")
 ```
 
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise 2</div>
+<div class="panel-body">
 
-```{r}
+Create dataframe x and y as above and code that mimics the results depicted in the diagrams.
+
+```{r, eval = FALSE}
+y <- data_frame(A = c("c", "d"),
+                B = c("v", "w"),
+                C = c(3, 4))
+bind_rows(x, y)
+union(x, y)
+intersect(x, y)
 setdiff(x, y)
 setdiff(y, x)
 ```
 
-
-TODO: Assignment
-
+</div>
+</div>

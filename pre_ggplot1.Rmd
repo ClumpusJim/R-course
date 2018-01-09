@@ -13,13 +13,18 @@ ___
 #### Needed libraries for this tutorial:
 ```{r, message = FALSE, warning = FALSE, results='hide'}
 library(tidyverse)
+```
+
+```{r echo = FALSE}
 theme_set(theme_grey(base_size = 16))  # larger text base size (default is 12)
 ```
 
 #### Getting example data into R
 ```{r}
-d <- read_csv("data/minke.csv")
+d <- read_csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv")
 ```
+
+Information on the [minke data](data.html)
 
 # ggplot: Key components
 ___
@@ -163,18 +168,30 @@ ggplot(d) +
 # Adding layers
 ___
 
-The power of ggplot comes into place when one adds layers on top of other layers.
+The power of ggplot comes into place when one adds layers on top of other layers. Let's for now look at only at two examples.
+
+### Add a line to a scatterplot
+
+```{r}
+ggplot(d, aes(date, length)) +
+  geom_point() +
+  geom_line()
+```
+
+Not very useful, given the data :-)
 
 ### Add a smoother to a scatterplot
 
 ```{r, out.width = "33%", fig.show = "hold"}
 p <- ggplot(d, aes(age, length))
 p + geom_point() + geom_smooth()
-p + geom_point() + geom_smooth(span = 0.1)
 p + geom_point() + geom_smooth(method = "lm")
+vonB <- function(x, Loo = 800, K = 0.2, to = 0) {
+    Loo * (1 - exp(-(K * (x - to))))
+}
+p + geom_point() + stat_function(fun = vonB)
 ```
 
-In the rightmost plot a linear regression is fitted (check out ?lm).
 
 <div class="panel panel-warning">
 <div class="panel-heading">Exercise</div>
@@ -381,3 +398,15 @@ ___
 * R graphics cookbook: http://www.cookbook-r.com/Graphs
 * [Data Visualization Cheat Sheet](https://github.com/rstudio/cheatsheets/raw/master/data-visualization-2.1.pdf)
 
+
+# Home work
+___
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+Find some data of your interest, import them and start plotting.
+
+</div>
+</div>

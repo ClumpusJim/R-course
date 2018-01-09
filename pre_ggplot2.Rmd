@@ -1,5 +1,5 @@
 ---
-title: "Plotting spatial data"
+title: "Spatial data and ggplot"
 output: 
   html_document:
     fig_height: 4
@@ -14,24 +14,26 @@ output:
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
+# Preamble
+
 ```{r, message = FALSE, warning = FALSE, results='hide'}
-library(devtools)
-# install_github("tidyverse/ggplot2")
-library(geo)
-library(maps)
-library(mapdata)
-library(lubridate)
+# devtools::install_github("tidyverse/ggplot2")  # has geom_sf
 library(tidyverse)
-library(cowplot)
-theme_set(theme_grey())
-library(ggmap)
-minke <- read_csv("data/minke.csv")
+library(lubridate)
+
+# use install.packages("packagename") if packages below are not
+#   already on your computer
+library(geo)               # the old faithful
+library(maps)              # basic low resolution maps
+library(mapdata)           # some high resolution maps
+library(cowplot)           # arrange multiple plots into a grid
+theme_set(theme_grey())    # set theme back to ggplot base theme
+library(ggmap)             # tile backgrounds
 ```
 
-# Getting started
-
-The minke data has two columns that refer to geographical coordinates. Lets plot the location of the minke sample: 
+Lets continue using the minke data, because it has two columns that refer to geographical coordinates. Lets plot the location of the minke sample: 
 ```{r}
+minke <- read_csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv")
 minke %>% 
   ggplot(aes(lon, lat)) +
   geom_point(colour = "red")
@@ -42,39 +44,44 @@ In the above plot, we basically have mapped the longitude on the x-axis and the 
 * A background, giving the reader a better indication of the geographical region of the sample location.
 * The projection (aspect ratio between the x- and the y-axis) looks wrong
 
-## Some backgrounds
-
-* Maps as background for r-plot can come from myriad of sources. Here we take an example of objects available in the map- and mapdata-packages.
-* To get the data into ggplot2 friendly form (data.frame) we use the `map_data` function.
+Lets add some random island as a background and use the "Mercator" projection (the default):
 
 ```{r}
-iceland <- map_data("world", region = "Iceland")
+minke %>% 
+  ggplot(aes(lon, lat)) +
+  geom_path(data = island) +
+  geom_point(colour = "red") +
+  coord_map(projection = "mercator")
+```
+
+The only magic here is that the background map is just a dataframe with a set of longitudinal and latitudinal coordinates that are **arrange**-ed in a specific way. And the fuction `geom_path` respects that order (try to use `geom_line` instead in the above code)
+
+# On backgrounds
+
+## Detail shoreline of Iceland (a shapefile)
+
+A more detail map of shorelines than provided in the geo-package can be obtained from [LMI](http://www.lmi.is). It has been conveniently placed at ftp://ftp.hafro.is/pub/reiknid/einar/shapes in the form of an ESRI shapefile. To read it into R one could do:
+
+```{r, eval = FALSE}
+download.file("ftp://ftp.hafro.is/pub/reiknid/einar/shapes/iceland.zip",
+              destfile = "data/iceland.zip")
+unzip("data/iceland.zip", exdir = "data")
+```
+
+```{r}
+iceland <- rgdal::readOGR("data/iceland.shp") %>% fortify()
 glimpse(iceland)
 ```
 
-Here we have just a simple dataframe with coordinates and some other variables. We can try map these coordinates to different layers:
+Here the coordinates are stored in columns "long" and "lat" with each "island" separated by column name "group". Hence to plot it we use the group arguement in the `aes`-function:
 ```{r}
-p <- ggplot(iceland, aes(long, lat)) + labs(x = NULL, y = NULL)
-p1 <- p + geom_point()
-p2 <- p + geom_line()
-p3 <- p + geom_path()
-p4 <- p + geom_polygon()
-plot_grid(p1, p2, p3, p4)
+ggplot() +
+  geom_polygon(data = iceland, aes(long, lat, group = group)) +
+  coord_map(xlim = c(-22.9, -22.4), ylim = c(65, 65.25))
 ```
 
-The above sweep of plots demonstrate that background maps are just a set of longitudinal and latitudinal data that are **arrange**-ed in a specific way (check help file for `geom_line` vs `geom_path`).
+Even more details are provided in the "biceland.zip" in the ftp-directory
 
-## Projections
-
-As noted above a map is just a xy-plot but with a certain projections. We could try to guess the projections (i.e. the aspect ration of the plot) as done on the left, or better still use the `geom_quickmap` function (on the right):
-
-```{r}
-p1 <- p3 + coord_fixed(ratio = 2.4)
-p2 <- p3 + coord_quickmap()
-plot_grid(p1, p2)
-```
-
-The above demonstrates that a spatial map in its simplest term is just an xy-plot with a specific projection. Note that the `coord_quickmap` is only an approximation, if one is operating on a fine scale `coord_map` may be more accurate (actually all maps are wrong when put on a two dimentional pane).
 
 ## Selecting a background by boundaries
 
@@ -91,7 +98,7 @@ ggplot(m, aes(long, lat, group = group)) +
 
 Here there are two additional element introduced:
 
-* The **variable** group in the m-dataframe is a unique identifier of each separate shape (islands etc.). By specifying the **arguement** group in the `aes`-function one prevents that polygons are drawn across separate elements (try omitting the group-argument).
+* The **variable** group in the m-dataframe is a unique identifier of each separate shape (islands etc.). By specifying the **argument** group in the `aes`-function one prevents that polygons are drawn across separate elements (try omitting the group-argument).
 * The limits are specified inside the call in function `coord_quickmap`. This is because the function `map_data` returns the whole regions that fall within the boundaries (try `coord_quickmap` without any argument).    
 
 #### Exercise
@@ -101,7 +108,7 @@ Here there are two additional element introduced:
 <div class="panel-body">
 
 1. Play around by selecting and plotting different regions or areas
-2. Read the `coord_map` help file for projections other than the default "mercator". Try to create a map that looks something along:
+2. Read the `coord_map` help file for projections other than the default "Mercator". Try to create a map that looks something along:
 
 ```{r, echo = FALSE}
 map_data("world") %>% 
