@@ -1,0 +1,396 @@
+---
+title: "Working with MFRI databases"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Databases
+
+We have seen earlier how to do deal with a diverse source of data, e.g. text files and excel files. However among the largest datasources are computer systems collectively called "databases". In general a database is (from wikipedia): 
+
+> A database is an organized collection of data. A relational database, more restrictively, is a collection of schemas, tables, queries, reports, views, and other elements. Database designers typically organize the data to model aspects of reality in a way that supports processes requiring information. 
+
+But commonly when we talk about databases we also refer to the database management system:
+
+> A database-management system (DBMS) is a computer-software application that interacts with end-users, other applications, and the database itself to capture and analyze data. A general-purpose DBMS allows the definition, creation, querying, update, and administration of databases.
+
+The typical DBMS implements a query language to allow users to interact with the system and perform analyses on the data. In the vast majority of cases the query language is a variant of the *S*tructured *Q*uery *L*anguage. SQL is a simple and limited programming language but extremely powerful when exploring properties of the data. For instance if you want to know how total of otolith samples by year and species that are available in our database the SQL query would look something like this:
+
+```
+select tegund, ar, count(1) 
+from fiskar.stodvar s 
+left join fiskar.kvarnir k on s.synis_id = k.synis_id
+group by tegund, ar
+```
+
+## The MFRI DB system
+
+At the MFRI there is an Oracle database system used to store all regularly sampled data. 
+
+
+## Tidyverse connection to MRI oracle database
+
+The [`dplyr`-package](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html) is designed so that, in addition to working with local R-data.frames, it works with remote on-disk data stored in databases. [Inbuilt functions within dplyr](https://cran.rstudio.com/web/packages/dplyr/vignettes/databases.html) allow seamless connectivity with sqlite, mysql, postgresql and now recently Oracle. Due to some idiosyncrasies associated with schema as well as issues related to case-sensitivity "default" communication with Oracle is not straight forward. These issues, as well as other convenience wrappers, are taken care of in the `mar`-packages.
+
+### Installation
+
+You have to do this once, or when you want to update the packages already installed on your computer:
+
+```{r, eval = FALSE}
+install.packages("tidyverse")
+install.packages("devtools")
+install.packages('dbplyr')
+devtools::install_github("fishvice/mar",  dependencies = FALSE)
+```
+
+Windows users may encounter issues when installing the mar - package related to different binary modes (32 bit vs 64 bit) where the user is prompted with the following error 
+
+> ERROR: loading failed for 'i386'
+
+This issue can be bypassed by installing mar using: 
+```{r, eval = FALSE}
+devtools::install_github("fishvice/mar",  dependencies = FALSE, args='--no-multiarch')
+```
+
+
+### Establish connection
+
+When the `mar`-library is intalled you can start to play with the data on the database. First load the library into your session:
+```{r, message = FALSE}
+library(mar)
+```
+
+and the next thing to do is to connect to MFRI Oracle database using the following:
+```{r}
+con <- connect_mar()
+```
+
+`connect_mar` sets up a connection to the MFRI database MAR based on your login credentials. Note that `connect_mar` is simply a convenience wrapper around
+
+```{r,eval=FALSE}
+DBI::dbConnect(DBI::dbDriver("Oracle"))
+```
+which offers more flexibility when working with other Oracle databases. 
+
+### Some (hopefully) gentle introduction
+___
+
+The core function in the `mar`-package is the `tbl_mar`-function. It takes two arguments, the "connection" and the name of the oracle table. E.g. to establish a connection to the table "lengdir" in the schema "fiskar" one can do:
+```{r}
+lengdir <- tbl_mar(con, "fiskar.lengdir")
+```
+
+If you look at the `lengdir` object:
+```{r}
+class(lengdir)
+```
+The class here is somewhat obtuse. Lets not worry about that to much. What has happened behind the scene one can realize by:
+```{r}
+show_query(lengdir) 
+```
+Ergo we generated an object, which one part is an SQL-query. The `show_query` informs us how the database plans to execute the query.
+
+The operation has not yet touched the database. It’s not until you ask for the data (e.g. by printing lengdir) that dplyr generates the SQL and requests the results from the database. Even then it only pulls down 10 rows.
+```{r}
+lengdir
+```
+Now, there are columns returned that we have little interest in (sbt:snn). Using the `dplyr`-verbs (functions) one can easily build upon the base query, e.g.:
+```{r}
+lengdir %>% 
+  select(synis_id, tegund, lengd, fjoldi, kyn, kynthroski)
+```
+
+Now if one were only interested in one species and one station we may extend the above as:
+```{r}
+lengdir <- 
+  tbl_mar(con, "fiskar.lengdir") %>% 
+  select(synis_id, tegund, lengd, fjoldi, kyn, kynthroski) %>% 
+  filter(synis_id == 48489,
+         tegund == 1)
+show_query(lengdir)
+```
+
+To pull down all the results into R one uses collect(), which returns a tidyverse data.frame (tbl_df):
+```{r}
+d <- 
+  lengdir %>% 
+  collect(n = Inf)
+class(d)
+dim(d)
+```
+
+A quick visualization of the data can be obtained via:
+```{r ldist}
+d %>% 
+  ggplot() +
+  geom_bar(aes(lengd, fjoldi), stat = "identity")
+```
+
+So we have the length distribution of measured cod from one sample (station). We do not however know what this sample is, because the column **synis_id** is just some gibberish automatically generated within Oracle and it is used as a reference id between a group of tables. For example the number of fish caught at station in stored in "fiskar.numer":
+```{r}
+tbl_mar(con, 'fiskar.numer')
+```
+and as before you can remove unwanted columns using the `select` function:
+```{r}
+numer <- 
+  tbl_mar(con,'fiskar.numer') %>% 
+  select(-c(snt:sbt))
+numer
+```
+and as with data.frame we can join database tables using the `*_join` functions from `dbplyr`:
+
+```{r}
+d <- 
+lengdir %>% 
+  inner_join(numer) ## only those ids that are in both tables
+d
+```
+
+and you can continue to add `dplyr` commands to the query:
+
+```{r}
+d2 <- 
+  d %>% 
+  group_by(tegund) %>% 
+  summarise(fjoldi = sum(fjoldi*fj_maelt/(ifelse(fj_talid==0,fj_maelt,fj_talid)))) %>% 
+  arrange(fjoldi)
+d2
+
+```
+
+This above query scales with the counted fish.
+
+```{r}
+d2 %>% show_query()
+```
+
+The SQL query has now become a bunch of gibberish for some of us. But this demonstrates that in addition to **select** and **filter** the `dplyr`-verbs **group_by**, **inner_join**, **summarise** and **arrange** are "translated" into SQL :-) To import the outcome into R we do:
+```{r}
+d2 %>% collect(n = Inf)
+```
+
+
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise 1</div>
+<div class="panel-body">
+
+1. Try to connect to mar
+2. Look at "fiskar.stodvar", read in the first 100 entries into R.
+3. Join lengdir with "fiskar.stodvar"
+
+</div>
+</div>
+
+## Convenience functions 
+
+The `tbl_mar` function allows you to deal with any table already in the database. But the `mar` package also has a lot of convenience functions to deal the most commonly used queries. So for example we have the `lesa_lengdir`-function that resides in the `mar`-package:
+
+```{r}
+lesa_lengdir(con)
+```
+
+Here we have same columns as above. For the tables in the 'fiskar' schema we have: 
+
+```{r,eval = FALSE}
+lesa_stodvar(con)       ## query the survey stations, translates locations
+lesa_lengdir(con)       ## length table
+lesa_numer(con)         ## numbers of fish per station
+lesa_kvarnir(con)       ## biological measurements
+skala_med_toldum(tbl)   ## scale the numbers in lengths with numbers
+```
+
+
+Lets used `lesa_lengdir` as our starting point, this time lets ask the question how many fish by species were length measured from this yet unknown station:
+```{r}
+d <-
+  lesa_lengdir(con) %>% 
+  filter(synis_id == 48489) %>% 
+  group_by(tegund) %>% 
+  summarise(fjoldi = sum(fjoldi)) %>% 
+  arrange(fjoldi)
+show_query(d)
+```
+
+The SQL query has now become a bunch of gibberish for some of us. But this demonstrates that in addition to **select** and **filter** the `dplyr`-verbs **group_by**, **summarise** and **arrange** are "translated" into SQL :-) To see the outcome we do:
+```{r}
+d %>% collect(n = Inf)
+```
+
+Those familiar with the fiskar database know that these information are also available in the table **numer**. Here we can use the ``mar::lesa_numer` function:
+```{r}
+lesa_numer(con) %>% 
+  filter(synis_id == 48489)
+```
+
+```{r}
+lesa_numer(con) %>% 
+  filter(synis_id == 48489) %>% 
+  select(tegund, fj_maelt, fj_talid) %>% 
+  arrange(fj_maelt) %>% 
+  collect(n = Inf)
+```
+
+So we get a dataframe that has more species than those obtained from `lesa_lengdir`. This is because the sample (station) also contained some species that were not measured, only counted.
+
+Information about the station that corresponds to synis_id = 48489 reside in the station table:
+```{r}
+lesa_stodvar(con) %>% 
+  filter(synis_id == 48489) %>% 
+  collect(n=Inf) %>% 
+  glimpse()
+```
+
+For those familiar with what is stored in **fiskar.stodvar** recognize that the station is most likely part of the 1991 spring survey (veidarfaeri = 73 and synaflokkur = 30 provides the best hint). What if we were to start from this end and get all the stations from the 1991 survey and calculate the average number and standard deviataion in the number cod caught in the survey that year:
+```{r}
+smb1991 <-
+  lesa_stodvar(con) %>%
+  inner_join(lesa_lengdir(con)) %>%
+  filter(ar == 1991,
+         tegund == 1, 
+         veidarfaeri == 73,
+         synaflokkur == 30) %>% 
+  group_by(synis_id) %>% 
+  summarise(num.cod = sum(fjoldi)) %>% 
+  ungroup() %>% 
+  summarise(m.num = mean(num.cod),
+            sd.num = sd(num.cod))
+```
+A side note, those of you that have worked with these data may notice that the numbers at lengths have not be scaled according the numbers measured. For our convenience the function `skala_med_toldum` does exactly that:
+
+```{r}
+smb1991 <-
+  lesa_stodvar(con) %>%
+  inner_join(lesa_lengdir(con)) %>%
+  skala_med_toldum() %>% 
+  filter(ar == 1991,
+         tegund == 1, 
+         veidarfaeri == 73,
+         synaflokkur == 30) %>% 
+  group_by(synis_id) %>% 
+  summarise(num.cod = sum(fjoldi)) %>% 
+  ungroup() %>% 
+  summarise(m.num = mean(num.cod),
+            sd.num = sd(num.cod))
+
+```
+This analysis can the be quickly extended to all years:
+```{r}
+smb_all <-
+  lesa_stodvar(con) %>%
+  inner_join(lesa_lengdir(con)) %>%
+  filter(tegund == 1, 
+         veidarfaeri == 73,
+         synaflokkur == 30) %>% 
+  group_by(ar,synis_id) %>% 
+  summarise(num.cod = sum(fjoldi)) %>% 
+  group_by(ar) %>% 
+  summarise(m.num = mean(num.cod),
+            sd.num = sd(num.cod))
+smb_all
+```
+
+And we can then feed all this gunk into ggplot:
+```{r smb_all_plot}
+smb_all %>% 
+  collect(n = Inf) %>% 
+  ggplot(aes(ar,m.num)) +
+  geom_line(col = "red") +
+  geom_errorbar(aes(ymax = m.num + 1.96*sd.num,ymin = m.num - 1.96*sd.num))
+
+```
+
+
+
+```{r, eval = FALSE, echo = FALSE}
+d <- lods_oslaegt(con) %>%
+  left_join(skipaskra(con) %>% select(skip_nr, flokkur), by = "skip_nr") %>% 
+  filter(fteg == 1,
+         flokkur != -4,
+         veidisvaedi == "I") %>%
+  group_by(timabil, gerd) %>%
+  summarise(afli = sum(magn_oslaegt)) %>%
+  arrange(timabil, gerd)
+show_query(d)
+d %>% collect(n = Inf)
+```
+
+### Metadata
+
+List of tables available to the user (only first 10 tables shown here):
+```{r}
+mar_tables(con, schema = 'fiskar')
+```
+
+Description of the variables of a particular table (only first 10 variables shown here): 
+```{r}
+mar_fields(con,'fiskar.stodvar')
+```
+
+
+
+### Something else (more advanced)
+____
+
+... pending
+
+### Working with stomach data
+____
+
+Let's look at stomach samples. Restrict our analysis to fish from the spring survey after 1992.
+
+
+```{r}
+st <- 
+  lesa_stodvar(con) %>% 
+  filter(synaflokkur == 30, ar > 1992) %>% 
+  select(synis_id,ar)
+
+```
+  
+and only look at stomachs from cods between 40 and 80 fish
+
+```{r}
+tmp <- 
+  faeda_ranfiskar(con) %>% 
+  filter(lengd %in% 40:80,ranfiskur == 1) %>% 
+  mutate(weight = 0.01*lengd^3) %>% 
+  right_join(st) %>% 
+  left_join(faeda_thyngdir(con)) %>% 
+  mutate(faeduhopur = nvl(faeduhopur,'Empty'),
+         thyngd = nvl(thyngd,0))
+```
+
+Look at the average percentage of body weight capelin in the stomach is in the spring survey compared to other species
+```{r}
+tmp %>% 
+  left_join(tmp %>% 
+              group_by(flokk_id) %>% 
+              summarise(total = sum(thyngd))) %>% 
+  select(ar,flokk_id,faeduhopur,thyngd,total,weight) %>% 
+  group_by(ar,flokk_id,faeduhopur,weight) %>%  ## why do we have duplicate prey entries?
+  summarise(thyngd=sum(thyngd),total=sum(total)) %>% 
+  collect(n=Inf) %>% 
+  ungroup() %>% 
+  spread(faeduhopur,thyngd,fill=0) %>% ## this function should be availabe in the database
+  select(ar,flokk_id,weight,capelin=`mall vil`,total) %>% 
+  mutate(otherfood = (total - capelin)/weight,
+         capelin = capelin/weight) %>%  
+  select(ar,capelin,otherfood) %>% 
+  gather(Prey,prop,-ar) %>% 
+  group_by(ar,Prey) %>% 
+  summarise(prop=mean(prop,na.rm=TRUE)) %>% 
+  ggplot(aes(ar,prop,fill=Prey)) + geom_bar(stat = 'identity')
+  
+            
+```
+
+
+
+```{r}
+devtools::session_info()
+```
+
