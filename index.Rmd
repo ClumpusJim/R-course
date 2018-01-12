@@ -61,7 +61,7 @@ ___
 ### Friday, 2018-01-12
 
 * 09:00 - 12:00
-    * [Working with (mfri) databases and introduction to the mar-package](404page.html) - bte
+    * [Working with (mfri) databases and introduction to the mar-package](pre_mar.html) - bte
 * 13:00 - 16:00
     * [Spatial data and ggplot](404page.html) - eh
 
