@@ -101,18 +101,31 @@ con <- connect_mar()
 
 `connect_mar` sets up a connection to the MFRI database MAR based on your login credentials. Note that `connect_mar` is simply a convenience wrapper around
 
-```{r,eval=FALSE}
+```{r, eval=FALSE}
 DBI::dbConnect(DBI::dbDriver("Oracle"))
 ```
 which offers more flexibility when working with other Oracle databases. 
+
+Some problems may come up, mostly associated with the setup of the computer
+
+* You must be connected to the Hafro-network, either physically or via wireless or via vpnc
+* The R-version  has to be >= 3.4.3 ((as of this writing 2018-01-12) - check out cran.hafro.is
+* ROracle package may not be setup - you may get a message something like "there is no package called ‘ROracle’". If that is the case try:
+```{r, eval = FALSE}
+install.packages("ROracle",repos="http://r.hafro.is",
+                 lib=Sys.getenv("R_LIBS_SITE"),type="binary")
+```
 
 ### Using the `mar` package
 ___
 
 The core function in the `mar`-package is the `tbl_mar`-function. It takes two arguments, the "connection" and the name of the oracle table. E.g. to establish a connection to the table "lengdir" in the schema "fiskar" one can do:
+
 ```{r message=FALSE, warning=FALSE}
 lengdir <- tbl_mar(con, "fiskar.lengdir")
 ```
+
+Note: If you have established a connection but do get an error in the above command you do not have acess to the table fiskar.lengdir
 
 If you look at the `lengdir` object:
 ```{r message=FALSE, warning=FALSE}
@@ -126,7 +139,7 @@ Ergo we generated an object, which one part is an SQL-query. The `show_query` in
 
 The operation has not yet touched the database. It’s not until you ask for the data (e.g. by printing lengdir) that dplyr generates the SQL and requests the results from the database. Even then it only pulls down 10 rows.
 ```{r message=FALSE, warning=FALSE}
-lengdir
+lengdir %>% glimpse()
 ```
 Now, there are columns returned that we have little interest in (`sbt:snn`). Using the `dplyr`-verbs (functions) one can easily build upon the base query, e.g.:
 ```{r message=FALSE, warning=FALSE}
@@ -162,14 +175,14 @@ d %>%
 
 So we have the length distribution of measured cod from one sample (station). We do not however know what this sample is, because the column **synis_id** is just some gibberish automatically generated within Oracle and it is used as a reference id between a group of tables. For example the number of fish caught at station in stored in "fiskar.numer":
 ```{r message=FALSE, warning=FALSE}
-tbl_mar(con, 'fiskar.numer')
+tbl_mar(con, 'fiskar.numer') %>% glimpse()
 ```
 and as before you can remove unwanted columns using the `select` function:
 ```{r message=FALSE, warning=FALSE}
 numer <- 
   tbl_mar(con,'fiskar.numer') %>% 
   select(-c(snt:sbt))
-numer
+numer %>% glimpse()
 ```
 and as with data.frame we can join database tables using the `*_join` functions from `dbplyr`:
 
@@ -177,7 +190,7 @@ and as with data.frame we can join database tables using the `*_join` functions 
 d <- 
 lengdir %>% 
   inner_join(numer) ## only those ids that are in both tables
-d
+d %>% glimpse()
 ```
 
 and you can continue to add `dplyr` commands to the query:
@@ -189,7 +202,6 @@ d2 <-
   summarise(fjoldi = sum(fjoldi*fj_maelt/(ifelse(fj_talid==0,fj_maelt,fj_talid)))) %>% 
   arrange(fjoldi)
 d2
-
 ```
 
 This above query scales with the counted fish.
@@ -213,6 +225,27 @@ d2 %>% collect(n = Inf)
 2. Look at "fiskar.stodvar", read in the first 100 entries into R.
 3. Join lengdir with "fiskar.stodvar"
 
+```{r eval = FALSE}
+con <- connect_mar()
+st.sql <- 
+  tbl_mar(con, "fiskar.stodvar")
+st.df <- 
+  st.sql %>% 
+  collect(n = 100)
+le.sql <-
+  tbl_mar(con, "fiskar.lengdir")
+# this works because both objects are still a connection
+le.sql %>% 
+  inner_join(st.sql)
+# this will not work because st2 is a internal R-table and le is still að connection
+le.sql %>% 
+  inner_join(st.df)
+# check out e.g.
+class(st.sql)
+class(st.df)
+class(le.sql)
+```
+
 </div>
 </div>
 
@@ -227,11 +260,12 @@ lesa_lengdir(con)
 Here we have same columns as above. For the tables in the 'fiskar' schema we have: 
 
 ```{r,eval = FALSE}
-lesa_stodvar(con)       ## query the survey stations, translates locations
-lesa_lengdir(con)       ## length table
-lesa_numer(con)         ## numbers of fish per station
-lesa_kvarnir(con)       ## biological measurements
-skala_med_toldum(tbl)   ## scale the numbers in lengths with numbers
+# glimpse here just used for making display easier, do not use in actual code
+lesa_stodvar(con) %>% glimpse()       ## query the survey stations, translates locations
+lesa_lengdir(con) %>% glimpse()       ## length table
+lesa_numer(con)   %>% glimpse()       ## numbers of fish per station
+lesa_kvarnir(con) %>% glimpse()       ## biological measurements
+skala_med_toldum(tbl)  ## scale the numbers in lengths with numbers
 ```
 
 
@@ -254,7 +288,7 @@ d %>% collect(n = Inf)
 Those familiar with the fiskar database know that these information are also available in the table **numer**. Here we can use the `lesa_numer` function:
 ```{r message=FALSE, warning=FALSE}
 lesa_numer(con) %>% 
-  filter(synis_id == 48489)
+  filter(synis_id == 48489) %>% glimpse()
 ```
 
 

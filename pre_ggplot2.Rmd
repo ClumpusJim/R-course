@@ -20,18 +20,20 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 # devtools::install_github("tidyverse/ggplot2")  # has geom_sf
 library(tidyverse)
 library(lubridate)
+library(mar)
 
 # use install.packages("packagename") if packages below are not
 #   already on your computer
 library(geo)               # the old faithful
 library(maps)              # basic low resolution maps
 library(mapdata)           # some high resolution maps
-library(cowplot)           # arrange multiple plots into a grid
-theme_set(theme_grey())    # set theme back to ggplot base theme
+library(marmap)            # to get bathymetric data from NOAA or GEBCO
 library(ggmap)             # tile backgrounds
+library(sp)                # spatial stuff
+library(rgdal)             # to read in ESRI files
 ```
 
-Lets continue using the minke data, because it has two columns that refer to geographical coordinates. Lets plot the location of the minke sample: 
+Lets continue using the minke data, because it has two columns that refer to geographical coordinates. Lets plot the "kill location" of the minkes: 
 ```{r}
 minke <- read_csv("ftp://ftp.hafro.is/pub/tcrenv/minke.csv")
 minke %>% 
@@ -49,18 +51,18 @@ Lets add some random island as a background and use the "Mercator" projection (t
 ```{r}
 minke %>% 
   ggplot(aes(lon, lat)) +
-  geom_path(data = island) +
+  geom_path(data = geo::island) +   # so, this object is in the geo-package
   geom_point(colour = "red") +
   coord_map(projection = "mercator")
 ```
 
-The only magic here is that the background map is just a dataframe with a set of longitudinal and latitudinal coordinates that are **arrange**-ed in a specific way. And the fuction `geom_path` respects that order (try to use `geom_line` instead in the above code)
+Here "the background map" is just a dataframe with a set of longitudinal and latitudinal coordinates (check out 'glimpse(island)') that are **arrange**-ed in a specific way. And the function `geom_path` respects that order (try to use `geom_line` instead in the above code). The call to `coord_map` in its most simple of terms sets the proper aspect ratio between the x- and the y-axis.
 
 # On backgrounds
 
-## Detail shoreline of Iceland (a shapefile)
+## Iceland
 
-A more detail map of shorelines than provided in the geo-package can be obtained from [LMI](http://www.lmi.is). It has been conveniently placed at ftp://ftp.hafro.is/pub/reiknid/einar/shapes in the form of an ESRI shapefile. To read it into R one could do:
+A more detail map of shorelines than provided in the geo-package (besides the bisland-object) can be obtained from [LMI](http://www.lmi.is). A thinned version has been conveniently placed at ftp://ftp.hafro.is/pub/reiknid/einar/shapes in the form of a zipped ESRI shapefiles (iceland.zip). To read it into R one would need to download the bundle first:
 
 ```{r, eval = FALSE}
 download.file("ftp://ftp.hafro.is/pub/reiknid/einar/shapes/iceland.zip",
@@ -68,47 +70,105 @@ download.file("ftp://ftp.hafro.is/pub/reiknid/einar/shapes/iceland.zip",
 unzip("data/iceland.zip", exdir = "data")
 ```
 
+Lets see what we have got:
 ```{r}
-iceland <- rgdal::readOGR("data/iceland.shp") %>% fortify()
+dir("data", pattern = "iceland")
+```
+
+So we have, besides the .zip file four files ending with .dbf, .prj, .shp and .shx. These are standard extensions of [ESRI shapefiles](https://en.wikipedia.org/wiki/Shapefile)
+
+And then read it into R with the `readOGR` function that resides in the rgdal-package:
+```{r}
+iceland <- 
+  rgdal::readOGR("data/iceland.shp", verbose = FALSE)
+class(iceland)
+# str(iceland)
+```
+
+The class of the object iceland is "SpatialPolygonsDataFrame" and the structure is kind of obtuse. Let's not worry too much about that now because `ggplot` can operate on these classes directly (example not shown here). What really happens behind the scene though is that the object is turned into a dataframe via the `fortify`-function. Let's look at what that returns:
+
+```{r}
+iceland <- iceland %>% fortify()
 glimpse(iceland)
 ```
 
-Here the coordinates are stored in columns "long" and "lat" with each "island" separated by column name "group". Hence to plot it we use the group arguement in the `aes`-function:
+Here the coordinates are stored in columns "long" and "lat" with each "island" separated by values in the variable "group". Hence to plot it we use the 'group' argument in the `aes`-function:
+
 ```{r}
 ggplot() +
   geom_polygon(data = iceland, aes(long, lat, group = group)) +
-  coord_map(xlim = c(-22.9, -22.4), ylim = c(65, 65.25))
+  geom_point(data = minke, aes(lon, lat), col = "red") +
+  coord_map(xlim = c(-22.8, -21.7), ylim = c(63.95, 64.4))
 ```
 
-Even more details are provided in the "biceland.zip" in the ftp-directory
+Here there are two additional element introduced:
 
+* The **variable** group in the iceland-dataframe is a unique identifier of each separate shape (islands, scerries, etc.). By specifying the **argument** group in the `aes`-function one prevents that polygons are drawn across separate elements.
+* The limits are specified inside the call in function `coord_quickmap`. This allows us to zoom into a specific region (try `coord_map` without any argument).
 
-## Selecting a background by boundaries
+If we had not constructed the code as above we would have gotten a bit of a mess. Try:
+```{r eval = FALSE}
+ggplot() +
+  geom_polygon(data = iceland, aes(long, lat)) +
+  coord_map(xlim = c(-22.8, -21.7), ylim = c(63.95, 64.4))
+ggplot() +
+  geom_polygon(data = iceland, aes(long, lat, group = group)) +
+  coord_map() +
+  xlim(c(-22.8, -21.7)) + ylim(c(63.95, 64.4))
+```
 
-Instead of selecting a specific named region of a map one can also specify the boundaries, E.g. to get a map of the North Sea:
+The original shapefile from LMI, which has a considerable higher resolution is available (at least temporarily) in the "biceland.zip" bundle in the [ftp-directory](ftp://ftp.hafro.is/pub/reiknid/einar/shapes)
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+As an exercise in downloading, extracting, importing and plotting a shapefile try to plot the minke data over the bormicon-area shape file (although not really a shoreline), the location of the zipped bundle being ftp://ftp.hafro.is/pub/reiknid/einar/shapes/bormicon.zip
+
+```{r, echo = FALSE, eval = FALSE}
+download.file("ftp://ftp.hafro.is/pub/reiknid/einar/shapes/bormicon.zip",
+              destfile = "data/bormicon.zip")
+unzip("data/bormicon.zip", exdir = "data")
+rgdal::readOGR("data/bormicon.shp", verbose = FALSE) %>% 
+  ggplot() +
+  geom_path(aes(long, lat, group = group)) +
+  geom_point(data = minke, aes(lon, lat), col = "red") +
+  coord_quickmap()
+```
+
+</div>
+</div>
+
+## Global shorelines
+
+Some few of you may be working on a larger scale than the some random islands. The country/shorelines accessible via function in the map-package may be enough to serve your needs.
+
+```{r}
+m <- map_data("world")
+ggplot(m, aes(long, lat, group = group)) +
+  geom_polygon() +
+  coord_quickmap()
+```
+
+A little higher resolution of the global country profiles is available in the mapdata-package. E.g. to get a map of the North Sea one could do:
 
 ```{r}
 xlim <- c(-5, 12)
-ylim <- c(52, 60)
+ylim <- c(50, 60)
 m <- map_data("worldHires", xlim = xlim, ylim = ylim)
 ggplot(m, aes(long, lat, group = group)) +
   geom_polygon() +
   coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE)
 ```
 
-Here there are two additional element introduced:
-
-* The **variable** group in the m-dataframe is a unique identifier of each separate shape (islands etc.). By specifying the **argument** group in the `aes`-function one prevents that polygons are drawn across separate elements (try omitting the group-argument).
-* The limits are specified inside the call in function `coord_quickmap`. This is because the function `map_data` returns the whole regions that fall within the boundaries (try `coord_quickmap` without any argument).    
-
 #### Exercise
 
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Homework</div>
 <div class="panel-body">
 
 1. Play around by selecting and plotting different regions or areas
-2. Read the `coord_map` help file for projections other than the default "Mercator". Try to create a map that looks something along:
+2. Read the `coord_map` help file for projections other than the default "Mercator". Try to create a map with different projections, e.g. one that looks something along (hint: ortho):
 
 ```{r, echo = FALSE}
 map_data("world") %>% 
@@ -123,29 +183,40 @@ map_data("world") %>%
 </div>
 </div>
 
-## Overlay data on maps
+## Background images
 
-Now lets plot our minke data over a map:
+The ggmap-packages allows one to obtain background images from the web via the `get_map`-function:
 
-1. First we generate a background map:
 ```{r}
-m <- 
-  ggplot() +
-  theme_bw() +
-  geom_polygon(data = iceland, aes(long, lat, group = group), fill = "grey90") +
-  coord_map() +
+m2 <- get_map(location = c(-19,65), zoom= 6)
+m2 <- ggmap(m2) +
   labs(x = NULL, y = NULL)
+m2
 ```
 
-2. Now add the minke data as a layer:
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
 
-```{r}
-p1 <- m + geom_point(data = minke, aes(lon, lat, colour = sex))
-p2 <- m + 
-  geom_point(data = minke, aes(lon, lat, size = stomach.weight), colour = "red", alpha = 0.5) +
-  scale_size_area(max_size = 10)
-plot_grid(p1, p2)
+1. Read the help file for `get_map` and get at minimum a satellite maptype.
+2. Overlay the minke data
+3. Try to limit the plot range to the range of the minke data
+
+
+```{r, echo = FALSE, eval = FALSE}
+m2 <- get_map(location = c(-19,65), zoom= 6, maptype = "satellite")
+m2 %>% 
+  ggmap() +
+  geom_point(data = minke, aes(lon, lat), colour = "red") +
+  labs(x = NULL, y = NULL) +
+  xlim(range(minke$lon)) +    # limit the map range  
+  ylim(range(minke$lat))      # to the data range
 ```
+
+</div>
+</div>
+
+Although using background "images" are impressive, the novelty wears off quickly. Think carefully about not cluttering your graphs with necessary noise.
 
 # Other background
 
@@ -156,7 +227,6 @@ In oceanography one is often interested in indicating depth. Global relief model
 ```{r}
 xlim <- c(-28, -10)
 ylim <- c(62.5, 67.5)
-library(marmap)
 depth <- 
   getNOAA.bathy(lon1 = xlim[1], lon2 = xlim[2],
                 lat1 = ylim[1], lat2 = ylim[2],
@@ -200,10 +270,8 @@ m + geom_point(data = minke, aes(lon, lat), colour = "red")
 ```
 
 
-#### Exercise
-
 <div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
+<div class="panel-heading">Homework</div>
 <div class="panel-body">
 
 1. Create a depth raster map of the region of your interest, e.g. for the longitudinal and latitudinal range that covers your data. If you do not have spatial data, use the NS-IBTS station data from the [Working with dates](pre_dates.html) presentation.
@@ -215,162 +283,99 @@ m + geom_point(data = minke, aes(lon, lat), colour = "red")
 </div>
 
 
+# A case example
 
-## Background images
-
-The ggmap-packages allows one to obtain background images from the web via the `get_map`-function:
-```{r}
-m2 <- get_map(location = c(-19,65), zoom= 6)
-m2 <- ggmap(m2) +
-  labs(x = NULL, y = NULL)
-m2
-```
-
-<div class="panel panel-warning">
-<div class="panel-heading">Exercise</div>
-<div class="panel-body">
-
-1. Read the help file for `get_map` and explore some different maptypes and sources available.
-2. Overlay the contours just generated on top of such a map
-3. Overlay the minke data
-
-
-```{r, echo = FALSE, eval = FALSE}
-m2 + 
-  geom_contour(data = depth, aes(x, y, z = z),
-               breaks=c(-50, -100, -200, -400),
-               colour="white", size=0.2) +
-  geom_point(data = minke, aes(lon, lat), colour = "red")
-```
-
-</div>
-</div>
-
-
-## Shapefiles
-
-Myriads of useful shapefiles are available on the web, including the ices web. An example is the shapefile that contains the 10 "NS-IBTS roundfish areas" of the North Sea. We can obtain it directly from within R via:
-
-* First we use the `download.file` function, specifying the web location and the destination of where we want to store the file.
-* Unzip the file using `unzip` function specifying where we want the content of the zipped file to be stored. 
-
-```{r, eval = FALSE}
-download.file(url = "http://gis.ices.dk/Shapefiles/6951716_output.zip",
-              destfile = "data/6951716_output.zip", mode = "wb")
-unzip("data/6951716_output.zip", exdir = "data")
-```
-
-If you now look into the data directory you will have four files starting with "Shapefile" and then four different suffixes. These are standard ESRI files that can be read into R via myriads of functions. Lets use the `st_read` function from the sf-package (which is currently in the process of development):
-```{r}
-library(sf)
-ns_area <- sf::st_read("data/Shapefile.dbf", quiet = TRUE)
-class(ns_area)
-```
-
-We observe that this is a specialized dataframe. Lets take a peek:
-```{r}
-ns_area
-```
-
-It is beyond the scope of this course to dig deeply into spatial data, but a simple visualization can be obtained via:
+## SMB tow tracks
 
 ```{r}
-ns_area %>% 
-  mutate(AreaName = as.integer(AreaName)) %>% 
+con <- connect_mar()
+lesa_stodvar(con) %>% 
+  filter(synaflokkur == 30,
+         ar == 2017) %>% 
+  collect(n = Inf) %>% 
   ggplot() +
-  theme_bw() +
-  geom_sf(aes(fill = factor(AreaName))) +
-  scale_fill_brewer(palette = "Set3") +
-  labs(title = "North Sea roundfish area",
-       subtitle = "Used for generation of age-length-keys",
-       fill = "ALK areas") 
+  geom_polygon(data = island, aes(lon, lat)) +
+  geom_segment(aes(x = kastad_v_lengd,
+                   y = kastad_n_breidd,
+                   xend = hift_v_lengd,
+                   yend = hift_n_breidd)) +
+  coord_quickmap()
 ```
 
-# Gridding data
+## Catch per tow
+
+Lets calculate the catch per tow from the spring survey:
+
+```{r}
+d.sql <-
+  lesa_stodvar(con) %>% 
+  inner_join(lesa_lengdir(con)) %>% 
+  filter(tegund == 3,                    # lets look at saithe
+         synaflokkur == 30) %>% 
+  skala_med_toldum() %>% 
+  mutate(b = fjoldi * 0.00001 * lengd^3) %>% 
+  rename(lon = kastad_v_lengd, lat = kastad_n_breidd) %>% 
+  group_by(synis_id, ar, lon, lat) %>% 
+  summarise(n = sum(fjoldi),
+            b = sum(b))
+d.df <-
+  d.sql %>% 
+  collect(n = Inf)
+d.df %>% 
+  ungroup() %>% 
+  filter(ar %in% seq(1990, 2015, by = 5)) %>% 
+  ggplot(aes(lon, lat)) +
+  geom_polygon(data = island) +
+  geom_point(aes(size = b),
+             colour = "red", alpha = 0.4) +
+  scale_size_area(max_size = 20) +
+  facet_wrap(~ ar) +
+  labs(x = NULL, y = NULL) +
+  coord_quickmap()
+```
+
+## Gridded data
 
 We are often interested in summarizing spatial data onto a grid for presentations. A typical example are logbook data which often can hold millions of records. Lets read in some bottom trawl logbook data from Iceland:
 
 ```{r}
-# You can download the data from
-# http://www.hafro.is/~einarhj/data/logbooks_station.csv
-# http://www.hafro.is/~einarhj/data/logbooks_catch.csv
-station  <- read_csv("data/logbook_station.csv")
-glimpse(station)
-```
-
-So we have some 100+ thousand tows with information of towtime (in minutes).
-
-As an example we could summarize the effort by year and ICES statistical rectangle as follows (read the help file on `d2ir`):
-```{r}
-st <- 
-  station %>% 
-  mutate(year = year(date),
-         sq = geo::d2ir(lat, lon)) %>% 
-  group_by(year, sq) %>% 
-  summarize(effort = sum(towtime / 60, na.rm = TRUE))
-glimpse(st)
-```
-
-We have condensed the data to some 292 records but in doing so we have lost the information on the coordinates. Hence before we proceed with any plotting we need to get the central position of the ICES rectangles (using the inverse of the function above):
-```{r}
-st %>% 
-  mutate(lon = geo::ir2d(sq)$lon,     # get the central position of
-         lat = geo::ir2d(sq)$lat) %>% #   the ices rectangle
+d.sql <-
+  afli_stofn(con) %>% 
+  left_join(afli_afli(con)) %>%     # catch by species is stored here
+  left_join(afli_toga(con)) %>%     # togtimi is stored here
+  filter(ar == 2017,
+         veidarf == 6) %>%          # bottom trawl
+  # "project" coordinates to a 1 x 0.5 degree grid
+  #    byproduct: get a new variable name "sq"
+  encode_zchords(col.names = c("breidd", "lengd"), dx = 1, dy = 0.5) %>%
+  group_by(sq) %>% 
+  summarise(catch = sum(afli)/1e3,
+            effort = sum(togtimi)/60)
+d.df <-
+  d.sql %>% 
+  collect(n = Inf) %>% 
+  separate(col = sq, into = c("lon", "lat"), sep = ":", convert = TRUE)
+d.df %>% 
   ggplot() +
   theme_bw() +
   geom_raster(aes(lon, lat, fill = effort/1e3)) +  
-  geom_polygon(data = iceland, aes(long, lat, group = group), fill = "grey") +
+  geom_polygon(data = island, aes(lon, lat), fill = "grey") +
   coord_quickmap() +
   scale_x_continuous(name = NULL, breaks = NULL) +
   scale_y_continuous(name = NULL, breaks = NULL) +
   scale_fill_continuous(type = "viridis", option = "B", direction = -1) +
   labs(fill = "Effort",
-       title = "Bottom trawl effort in 1000 hours") +
-  facet_wrap(~ year)
+       title = "Bottom trawl effort in 1000 hours")
 ```
-
 
 <div class="panel panel-warning">
 <div class="panel-heading">Exercise</div>
 <div class="panel-body">
 
-0. Repeat the exercise but use some tile-map background.
-
-**Will visit the exercise below once we gone through the join family of functions**.
-
-In addition to the station (tow) file there is an associated file containing information on the catches (kg) by species in each tow (logbook_catch.csv).
-
-1. Read in the file (you download it from the sharepoint)
-2. Select two species, e.g. *S. mentella* (61) and plaice (23), summarize the catch of each by year and ICES rectangle and plot it.
-3. Add some contours, e.g. 250 and 1000 meters depth to the plot
-
-
-```{r, echo = FALSE, eval = FALSE}
-catch <- read_csv("data/logbook_catch.csv")
-station %>% 
-  mutate(year = year(date),
-         sq = geo::d2ir(lat, lon)) %>% 
-  left_join(catch %>% filter(species %in% c(23, 61))) %>% 
-  group_by(year, sq, species) %>% 
-  summarise(catch = sum(catch, na.rm = TRUE) / 1e6) %>% 
-  filter(catch > 0) %>% 
-  mutate(lon = geo::ir2d(sq)$lon,     # get the central position of
-         lat = geo::ir2d(sq)$lat) %>% #   the ices rectangle
-  ggplot() +
-  theme_bw() +
-  geom_raster(aes(lon, lat, fill = catch)) +  
-  geom_contour(data = depth, aes(x, y, z = z),
-               breaks=c(-300, -1000),
-               colour = "blue", size=0.2) +
-  geom_polygon(data = iceland, aes(long, lat, group = group), fill = "grey") +
-  coord_quickmap() +
-  scale_x_continuous(name = NULL, breaks = NULL) +
-  scale_y_continuous(name = NULL, breaks = NULL) +
-  scale_fill_continuous(type = "viridis", option = "B", direction = -1) +
-  labs(fill = "Catch",
-       title = "Catch in kt") +
-  facet_grid(species ~ year)
-```
+1. Play with other species
+2. Play with other backgrounds
+3. Add layers, e.g. depth contours
+4. Try finer grids
 
 </div>
 </div>
