@@ -60,7 +60,7 @@ Here "the background map" is just a dataframe with a set of longitudinal and lat
 
 # On backgrounds
 
-## Iceland
+## Iceland - example of shapefile
 
 A more detail map of shorelines than provided in the geo-package (besides the bisland-object) can be obtained from [LMI](http://www.lmi.is). A thinned version has been conveniently placed at ftp://ftp.hafro.is/pub/reiknid/einar/shapes in the form of a zipped ESRI shapefiles (iceland.zip). To read it into R one would need to download the bundle first:
 
@@ -274,8 +274,8 @@ m + geom_point(data = minke, aes(lon, lat), colour = "red")
 <div class="panel-heading">Homework</div>
 <div class="panel-body">
 
-1. Create a depth raster map of the region of your interest, e.g. for the longitudinal and latitudinal range that covers your data. If you do not have spatial data, use the NS-IBTS station data from the [Working with dates](pre_dates.html) presentation.
-2. Create a contour map of the region of your interest, specifying your own preference for the depth range to show.
+1. Create a depth raster map of the region of your interest, e.g. for the longitudinal and latitudinal range that covers your data.
+2. Create a contour map of the region of your interest, specifying your own preference for the depth contour lines to show.
 3. Overlay your own data on top of the contour map.
 4. Try a plot where the raster image of depth is the background, overlay the contours and then your data. Although the image may look sexy, think about the **main** message your are trying to convey to the recipient of such a plot.
 
@@ -354,7 +354,12 @@ d.sql <-
 d.df <-
   d.sql %>% 
   collect(n = Inf) %>% 
-  separate(col = sq, into = c("lon", "lat"), sep = ":", convert = TRUE)
+  separate(col = sq, into = c("lon", "lat"), sep = ":", convert = TRUE) %>% 
+  # a temporary fix for windose because in the above the lon and the lat
+  #   are not converted to numeric values.
+  # so here, replace "," with "." in the lon and lat, then convert to numeric
+  mutate(lon = gsub(',','.',lon) %>% as.numeric(),
+         lat = gsub(',','.',lat) %>% as.numeric())
 d.df %>% 
   ggplot() +
   theme_bw() +
@@ -363,7 +368,7 @@ d.df %>%
   coord_quickmap() +
   scale_x_continuous(name = NULL, breaks = NULL) +
   scale_y_continuous(name = NULL, breaks = NULL) +
-  scale_fill_continuous(type = "viridis", option = "B", direction = -1) +
+  scale_fill_viridis_c(option = "B", direction = -1) +
   labs(fill = "Effort",
        title = "Bottom trawl effort in 1000 hours")
 ```

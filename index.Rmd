@@ -90,7 +90,7 @@ ___
 
 So far, informal discussion have resulted in having introduction to the following topics:
 
-* [Geocomputation with R](404page.html) - nn
+* [Geocomputation with R](https://bookdown.org/robinlovelace/geocompr/intro.html) - nn
 * [Creating Websites with R Markdown](404page.html) - nn
 
 
