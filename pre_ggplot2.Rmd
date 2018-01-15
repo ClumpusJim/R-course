@@ -12,6 +12,7 @@ output:
 
 ```{r, echo = FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+Sys.setenv(LANG = "en")
 ```
 
 # Preamble

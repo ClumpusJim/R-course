@@ -288,3 +288,16 @@ d %>%
 ```
 
 Further information on arithmetic with dates are found in section 16.4 in [r2ds](http://r4ds.had.co.nz/dates-and-times.html#time-spans).
+
+# mar
+
+```{r, eval = FALSE}
+library(mar)
+con <- connect_mar()
+tbl_mar(con, "fiskar.stodvar") %>% 
+  mutate(year = to_char(dags, "YYYY"),
+         month = to_char(dags, "MM"),
+         day = to_char(dags, "DD")) %>% 
+  select(synis_id, year:day)
+```
+
