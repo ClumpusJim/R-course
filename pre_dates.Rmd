@@ -129,7 +129,7 @@ We now have a lot of redundant columns so we could keep only the essential (for 
 ```{r}
 d <-
   d %>% 
-  select(id, timeshoot = datetime, hauldur, quarter, country)
+  select(id, datetime, hauldur, quarter, country)
 glimpse(d)
 ```
 
@@ -159,7 +159,7 @@ The functions above basically pull apart various elements of **date** or **datet
 If we turn our focus back to the DATRAS haul data we can e.g. easily extract and then visualize the number per day:
 ```{r}
 d %>% 
-  mutate(date = as_date(timeshoot)) %>%  # convert timedate to date
+  mutate(date = as_date(datetime)) %>%  # convert timedate to date
   ggplot(aes(date)) +
   geom_freqpoly(binwidth = 1)            # the bin here is 1 day
 ```
@@ -168,14 +168,15 @@ Or the number of hauls taken by weekday (both graphs here show the same result, 
 ```{r fig.show = "hold"}
 p1 <-
   d %>% 
-  mutate(wday = wday(timeshoot, label = TRUE, abbr = FALSE)) %>% 
+  mutate(wday = wday(datetime, label = TRUE, abbr = FALSE)) %>% 
   ggplot(aes(wday)) +
   geom_bar() +
   labs(x = NULL, y = "Number of hauls") +
   coord_flip()
 p2 <- 
   d %>% 
-  mutate(wday = wday(timeshoot, label = TRUE, abbr = FALSE)) %>% 
+  # lets get the weekday names in english for this plot
+  mutate(wday = wday(datetime, label = TRUE, abbr = FALSE, locale = "en_GB")) %>% 
   group_by(wday) %>% 
   count() %>% 
   ggplot(aes(wday, n)) +
@@ -198,7 +199,7 @@ We observe that most hauls are taken in the beginning of the workweek and the nu
 
 ```{r, echo = FALSE, eval = FALSE}
 d %>% 
-  mutate(wday = wday(timeshoot)) %>% 
+  mutate(wday = wday(datetime)) %>% 
   group_by(country, wday) %>% 
   count() %>% 
   ggplot(aes(wday, n, colour = country)) +
@@ -213,7 +214,7 @@ d %>%
 
 ```{r, echo = FALSE, eval = FALSE}
 d %>% 
-  mutate(hour = hour(timeshoot)) %>% 
+  mutate(hour = hour(datetime)) %>% 
   group_by(hour) %>% 
   count()
 ```
@@ -224,7 +225,7 @@ d %>%
 
 ```{r, echo = FALSE}
 d %>% 
-  mutate(wday = wday(timeshoot, label = TRUE), hour = hour(timeshoot)) %>% 
+  mutate(wday = wday(datetime, label = TRUE), hour = hour(datetime)) %>% 
   group_by(wday, hour) %>% 
   count() %>% 
   ggplot(aes(wday, hour, size = n, label = n)) +
@@ -241,7 +242,7 @@ d %>%
 
 ```{r, eval = FALSE, echo = FALSE}
 d %>% 
-  mutate(wday = wday(timeshoot, label = TRUE), hour = hour(timeshoot)) %>% 
+  mutate(wday = wday(datetime, label = TRUE), hour = hour(datetime)) %>% 
   group_by(country, wday, hour) %>% 
   count() %>% 
   ggplot(aes(wday, hour, size = n, label = n)) +
@@ -259,31 +260,31 @@ d %>%
 
 # Arithmetics with dates
 
-In the DATRAS haul data we have a variable hauldur that represents the haul duration in minutes. Given that we have the starting time of the haul (variable timeshoot) we should be able to calculate the end time of the haul (timehaul). Consider:
+In the DATRAS haul data we have a variable hauldur that represents the haul duration in minutes. Given that we have the starting time of the haul (variable datetime) we should be able to calculate the end time of the haul (timehaul). Consider:
 
 ```{r}
-timeshoot <- ymd_hm("2014-02-16 16:45")
+datetime <- ymd_hm("2014-02-16 16:45")
 hauldur <- 30
 ```
 
 One may think that it would be possible to calculate the haul time simply adding the haul duration to the time shot: 
 ```{r}
-timeshoot + hauldur
+datetime + hauldur
 ```
 
 This however only adds 30 seconds to the shoot time. This is because when it comes to date-time, the duration must be represented in seconds. Hence we would need to convert minutes to seconds before we do any arithmetic with time:
 
 ```{r}
-timehaul <- timeshoot + hauldur * 60
+datetime + hauldur * 60
 # or
-timeshoot + dminutes(30)
+datetime + dminutes(hauldur)
 ```
 
 We could hence calculate the haul time for the DATRAS hauls via:
 
 ```{r}
 d %>% 
-  mutate(timehaul = timeshoot + dminutes(hauldur)) %>% 
+  mutate(timehaul = datetime + dminutes(hauldur)) %>% 
   glimpse()
 ```
 
