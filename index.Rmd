@@ -75,8 +75,8 @@ ___
 
 * 09:00 - ??:00
     
-    * [Working with strings](404page.html) - nn
-    * Case example ??
+    * [Statistics in R](pre_statistics.html) -bte
+    * ?? [Working with strings](404page.html) - bte
 
 ### Friday, 2018-01-19
 
