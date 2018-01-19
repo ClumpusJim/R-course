@@ -42,39 +42,14 @@ In order to calculate standardized survey indices we need in addition to the tab
 * What strata each tow belongs to
 * The area of the stratas
 
-In oder to computate as much as possible in Oracle we would also need to load these tables into mar.
-
-```{r, eval = FALSE, echo = FALSE}
-lwcoeff <- tbl(con, "lwcoeff") %>% collect(n = Inf)
-smbstationsstrata <- tbl(con, "smbstationsstrata") %>% collect(n = Inf)
-oldstataarea <- tbl(con, "oldstataarea") %>% collect(n = Inf)
-save(lwcoeff, smbstationsstrata, oldstataarea, file = "data/smb_addins.rda")
-```
-
-For this demonstration the tables have been made available on the ftp-site as an r-binary bundle. Lets download it and take a peek:
+For this case example these tables have been made available to all:
 ```{r}
-dir.create("data")
-download.file("ftp://ftp.hafro.is/pub/tcrenv/smb_addins.rda",
-              destfile = "data/smb_addins.rda")
-load("data/smb_addins.rda")
-glimpse(lwcoeff)
-glimpse(smbstationsstrata)
-glimpse(oldstataarea)
+glimpse(tbl_mar(con, "ops$einarhj.lwcoeff"))
+glimpse(tbl_mar(con, "ops$einarhj.smbstationsstrata"))
+glimpse(tbl_mar(con, "ops$einarhj.oldstrataarea"))
 ```
 
 The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata (and then also some central position of strata, something we ignore for now).
-
-Lets load this stuff into mar:
-```{r, eval = FALSE}
-dbWriteTable(con, name = "lwcoeff", value = lwcoeff)
-dbWriteTable(con, name = "smbstationsstrata", value = smbstationsstrata)
-dbWriteTable(con, name = "oldstataarea", value = oldstataarea)
-```
-
-And lets "restart" with nothing up our sleves:
-```{r}
-rm(lwcoeff, smbstationsstrata, oldstataarea)
-```
 
 ### Select a species
 
@@ -157,7 +132,7 @@ d <-
   
   # 7. calculate_biomass from numbers, length and a and b ----------------------
   # 7.a get the length weight coefficients
-  left_join(tbl(con, "lwcoeff")) %>% 
+  left_join(tbl_mar(con, "ops$einarhj.lwcoeff")) %>% 
   # 7.b use Newton's law if lwcoefficient for species not specified
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
@@ -176,8 +151,8 @@ d <-
   
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
-  left_join(tbl(con, "smbstationsstrata") %>% 
-              select(synis_id, strata = oldstrata)) %>% 
+  left_join(tbl_mar(con, "ops$einarhj.smbstationsstrata") %>% 
+              select(synis_id, strata)) %>% 
   # 10.b group by year and strata and calculate number of stations, mean and sd
   group_by(ar, strata) %>% 
   summarise(sN  = n(),   # number of stations within strata
@@ -188,7 +163,7 @@ d <-
   
   # 11. raise to strata area ---------------------------------------------------
   # 11.a get area of the strata
-  left_join(tbl(con, "oldstataarea") %>% 
+  left_join(tbl_mar(con, "ops$einarhj.oldstrataarea") %>% 
               select(strata = oldstrata, area = rall.area)) %>% 
   # 11.b do the strata raising
   #  area is above is in km2, here convert nm2
@@ -261,5 +236,19 @@ d %>%
   labs(x = NULL, y = NULL,
        title = "Biomass indices",
        subtitle = "Comparison of the official (vatican) and tidy")
+```
+
+
+
+
+```{r, echo = FALSE, eval = FALSE}
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
+SMBSTATIONSSTRATA <- 
+  STODVAR.all %>%
+  select(synis_id = synis.id, strata = oldstrata, lon, lat)
+dbWriteTable(con, name = "SMBSTATIONSSTRATA", value = SMBSTATIONSSTRATA, overwrite = TRUE)
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
+OLDSTRATAAREA <- tbl(con, "oldstataarea") %>% collect(n = Inf)
+dbWriteTable(con, name = "OLDSTRATAAREA", value = OLDSTRATAAREA, overwrite = TRUE)
 ```
 
