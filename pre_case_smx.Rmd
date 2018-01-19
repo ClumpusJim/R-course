@@ -1,15 +1,18 @@
+---
 # Length based indices via mar
-
+---
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE,
                       warning = FALSE)
 ```
 
-## Preamble
+# Preamble
+___
 
 This case example demonstrates how to calculate standardized survey indices from SMB using the tidyverse approach.
 
+In principle the method is described in [Fjölrit 131](https://www.hafogvatn.is/static/research/files/fjolrit-131pdf). The pseudocode is something like:
 ```
 1.  get survey stations %>%
 2.  get length data %>%
@@ -25,7 +28,8 @@ This case example demonstrates how to calculate standardized survey indices from
 12. summarise by year                   # one record per year
 ```
 
-## Setup
+# Setup
+___
 
 ```{r}
 library(tidyverse)
@@ -34,7 +38,7 @@ con <- connect_mar()
 ```
 
 
-### Additonal tables in mar
+## Additonal tables in mar
 
 In order to calculate standardized survey indices we need in addition to the tables in mar information on:
 
@@ -49,15 +53,16 @@ glimpse(tbl_mar(con, "ops$einarhj.smbstationsstrata"))
 glimpse(tbl_mar(con, "ops$einarhj.oldstrataarea"))
 ```
 
-The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata (and then also some central position of strata, something we ignore for now).
+The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata.
 
-### Select a species
+## Select a species
 
 Lets select a species to work with and the length above which we want to obtain
 the standardized survey indices:
 ```{r}
-Species <- 1                   # Select a species
-Length <- 5                    # Minimum length for indices calculation
+Species <- 3                       # Select a species
+Length.min <- 5                    # Minimum length for indices calculation
+Length.max <- 500                  # Maximum length for indices calculation
 ```
 
 Some constants used in the standarization process:
@@ -86,7 +91,7 @@ A little helper function:
 #'
 calc_cv <- function(m, s, area, n) {
   
-  Mean = sum(m * area)/sum(area)
+  Mean = sum(m * area) / sum(area)
   Sum = sum(m * area)
   tmpsum = sum(m[!is.na(s)] * area[!is.na(s)])
   Calc.sdev = sqrt(sum(s[!is.na(s)]^2 * area[!is.na(s)]^2/  n[!is.na(s)])   / sum(area[!is.na(s)])^2)
@@ -97,7 +102,8 @@ calc_cv <- function(m, s, area, n) {
 }
 ```
 
-## The code
+# The code
+___
 
 ```{r}
 d <-  
@@ -105,12 +111,12 @@ d <-
   lesa_stodvar(con) %>% 
   filter(synaflokkur == 30, veidarfaeri == 73) %>% 
   select(synis_id, ar, toglengd, reitur, tognumer) %>% 
-
   
   # 2. get length data ---------------------------------------------------------
   left_join(lesa_lengdir(con) %>% 
               filter(tegund %in% Species,
-                     lengd >= Length) %>% 
+                     lengd >= Length.min,
+                     lengd < Length.max) %>% 
               group_by(synis_id, tegund, lengd) %>% 
               summarise(fjoldi = sum(fjoldi, na.rm = TRUE)) %>% 
               ungroup()) %>% 
@@ -119,6 +125,14 @@ d <-
   left_join(lesa_numer(con) %>% 
               mutate(r =  ifelse(fj_maelt != 0, 1 + fj_talid/fj_maelt, 1)) %>% 
               select(synis_id, tegund, r)) %>% 
+  
+  # 0. A temporary fix, for zero stations --------------------------------------
+  #     TODO: Find a more permanent solution so scripts works for more than
+  #           one species
+  mutate(tegund = if_else(is.na(tegund), Species, tegund),
+         lengd  = if_else(is.na(tegund), Length.min, lengd),
+         fjoldi = if_else(is.na(tegund), 0, fjoldi),
+         r      = if_else(is.na(tegund), 1, r)) %>% 
   
   # 4. scale by counted --------------------------------------------------------
   mutate(N = r * fjoldi / 1e3) %>%   # units of thousand
@@ -139,7 +153,7 @@ d <-
          B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
   
   # 8. summarise by station ----------------------------------------------------
-  group_by(synis_id, tognumer, ar, tegund) %>% 
+  group_by(synis_id, tognumer, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
   # Zero stations
@@ -152,7 +166,7 @@ d <-
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
   left_join(tbl_mar(con, "ops$einarhj.smbstationsstrata") %>% 
-              select(synis_id, strata)) %>% 
+              select(synis_id, strata = oldstrata)) %>% 
   # 10.b group by year and strata and calculate number of stations, mean and sd
   group_by(ar, strata) %>% 
   summarise(sN  = n(),   # number of stations within strata
@@ -187,6 +201,10 @@ d <-
   ungroup()
 ```
 
+
+# The results
+___
+
 ```{r}
 glimpse(d)
 ```
@@ -203,32 +221,33 @@ d %>%
        title = "Spring survey biomass indices")
 ```
 
+# Double check
 
+Below we make a comparison with calculation made by Pope Husky, just as a double check
 
-
-__A double test__:
 ```{r, echo = FALSE}
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
 vatican <-
  Allaggroldsmbindex %>%
- filter(species == 1,
+ filter(species == Species,
         svaedi == "Heild",
-        lengd == Length,
         diurnal == 0,
         fixed == 0) %>%
- select(year = ar, cb = bio.staerri, cb.cv = cv.bio.staerri) %>%
+ select(ar, lengd, b = bio.staerri, b.cv = cv.bio.staerri) %>%
  mutate(source = "vatican") %>%
  as_tibble()
+vatican <-
+  vatican %>% 
+  filter(lengd == max(min(lengd), Length.min))
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
 
 d %>% 
-  select(year = ar, cb = b, cb.cv = b.cv) %>% 
   mutate(source = "tidy",
-         year = year + 0.2) %>% 
+         ar = ar + 0.2) %>% 
   bind_rows(vatican) %>% 
-  ggplot(aes(year, cb)) +
-  geom_pointrange(aes(ymin = cb * (1 - cb.cv),
-                      ymax = cb * (1 + cb.cv),
+  ggplot(aes(ar, b)) +
+  geom_pointrange(aes(ymin = b * (1 - b.cv),
+                      ymax = b * (1 + b.cv),
                       colour = source),
                   lwd = 1) +
   scale_colour_brewer(palette = "Set1") +
@@ -238,17 +257,26 @@ d %>%
        subtitle = "Comparison of the official (vatican) and tidy")
 ```
 
+# Appendix
 
+Code used to generate the additional tables in mar:
 
-
-```{r, echo = FALSE, eval = FALSE}
+```{r, eval = FALSE}
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
-SMBSTATIONSSTRATA <- 
+d <- 
   STODVAR.all %>%
-  select(synis_id = synis.id, strata = oldstrata, lon, lat)
-dbWriteTable(con, name = "SMBSTATIONSSTRATA", value = SMBSTATIONSSTRATA, overwrite = TRUE)
+  select(synis_id = synis.id, oldstrata, newstrata)
+dbWriteTable(con, name = "SMBSTATIONSSTRATA", value = d, overwrite = TRUE)
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
-OLDSTRATAAREA <- tbl(con, "oldstataarea") %>% collect(n = Inf)
-dbWriteTable(con, name = "OLDSTRATAAREA", value = OLDSTRATAAREA, overwrite = TRUE)
+# sql("grant select on smbstationsstrata to h_fiskar_skoda")
+
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
+d <- 
+  data_frame(oldstrata = attributes(STRATAS)$names %>% as.integer(),
+             area = attributes(STRATAS)$area,
+             rall.area = attributes(STRATAS)$rall.area)
+dbWriteTable(con, name = "OLDSTRATAAREA", value = d, overwrite = TRUE)
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
+# sql("grant select on oldstrataarea to h_fiskar_skoda"
 ```
 
