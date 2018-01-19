@@ -1,0 +1,265 @@
+# Length based indices via mar
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+## Preamble
+
+This case example demonstrates how to calculate standardized survey indices from SMB using the tidyverse approach.
+
+```
+1.  get survey stations %>%
+2.  get length data %>%
+3.  get count data %>% 
+4.  scale by counted %>% 
+5.  trim towlength %>%                  # narrow extremes
+6.  standardize by towlength %>%        # on the number only
+7.  calculate_biomass %>%               # up to now one recort per length class
+8.  summarise by station %>%            # one record per station
+9.  filter stations                     # fixed, e.g. tognumer %in% 1:39
+10. summarise by strata %>%             # one record per strata
+11. raise to strata area %>%            # 
+12. summarise by year                   # one record per year
+```
+
+## Setup
+
+```{r}
+library(tidyverse)
+library(mar)
+con <- connect_mar()
+```
+
+
+### Additonal tables in mar
+
+In order to calculate standardized survey indices we need in addition to the tables in mar information on:
+
+* Length-weight coefficients
+* What strata each tow belongs to
+* The area of the stratas
+
+In oder to computate as much as possible in Oracle we would also need to load these tables into mar.
+
+```{r, eval = FALSE, echo = FALSE}
+lwcoeff <- tbl(con, "lwcoeff") %>% collect(n = Inf)
+smbstationsstrata <- tbl(con, "smbstationsstrata") %>% collect(n = Inf)
+oldstataarea <- tbl(con, "oldstataarea") %>% collect(n = Inf)
+save(lwcoeff, smbstationsstrata, oldstataarea, file = "data/smb_addins.rda")
+```
+
+For this demonstration the tables have been made available on the ftp-site as an r-binary bundle. Lets download it and take a peek:
+```{r}
+dir.create("data")
+download.file("ftp://ftp.hafro.is/pub/tcrenv/smb_addins.rda",
+              destfile = "data/smb_addins.rda")
+load("data/smb_addins.rda")
+glimpse(lwcoeff)
+glimpse(smbstationsstrata)
+glimpse(oldstataarea)
+```
+
+The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata (and then also some central position of strata, something we ignore for now).
+
+Lets load this stuff into mar:
+```{r, eval = FALSE}
+dbWriteTable(con, name = "lwcoeff", value = lwcoeff)
+dbWriteTable(con, name = "smbstationsstrata", value = smbstationsstrata)
+dbWriteTable(con, name = "oldstataarea", value = oldstataarea)
+```
+
+And lets "restart" with nothing up our sleves:
+```{r}
+rm(lwcoeff, smbstationsstrata, oldstataarea)
+```
+
+### Select a species
+
+Lets select a species to work with and the length above which we want to obtain
+the standardized survey indices:
+```{r}
+Species <- 1                   # Select a species
+Length <- 5                    # Minimum length for indices calculation
+```
+
+Some constants used in the standarization process:
+```{r}
+std.cv        <- 1             # The cv if only one station in a strata
+std.towlength <- 4             # Standard tow length is 4 nautical miles
+std.width     <- 17            # Standard sweep width in meters
+# Standard area swept, units of square nautical miles
+#   (1852 meters / nm)
+std.area <- std.towlength * std.width / 1852
+
+min.towlength <- 2             # Minimum "acceptable" towlength
+max.towlength <- 8             # Maximum "acceptable" towlength
+```
+
+A little helper function:
+```{r}
+#' Calculate overall cv from stratfied summary statistics
+#' 
+#' @param m Mean value within strata
+#' @param s Standard deviation within strata
+#' @param area The area (e.g. survey strata area)
+#' @param n number of samples within strata
+#'
+#' @export
+#'
+calc_cv <- function(m, s, area, n) {
+  
+  Mean = sum(m * area)/sum(area)
+  Sum = sum(m * area)
+  tmpsum = sum(m[!is.na(s)] * area[!is.na(s)])
+  Calc.sdev = sqrt(sum(s[!is.na(s)]^2 * area[!is.na(s)]^2/  n[!is.na(s)])   / sum(area[!is.na(s)])^2)
+  Sdev = Calc.sdev * Sum/tmpsum
+  cv = Sdev/Mean
+  
+  return(cv)
+}
+```
+
+## The code
+
+```{r}
+d <-  
+  # 1. get survey stations -----------------------------------------------------
+  lesa_stodvar(con) %>% 
+  filter(synaflokkur == 30, veidarfaeri == 73) %>% 
+  select(synis_id, ar, toglengd, reitur, tognumer) %>% 
+
+  
+  # 2. get length data ---------------------------------------------------------
+  left_join(lesa_lengdir(con) %>% 
+              filter(tegund %in% Species,
+                     lengd >= Length) %>% 
+              group_by(synis_id, tegund, lengd) %>% 
+              summarise(fjoldi = sum(fjoldi, na.rm = TRUE)) %>% 
+              ungroup()) %>% 
+  
+  # 3. get count data ----------------------------------------------------------
+  left_join(lesa_numer(con) %>% 
+              mutate(r =  ifelse(fj_maelt != 0, 1 + fj_talid/fj_maelt, 1)) %>% 
+              select(synis_id, tegund, r)) %>% 
+  
+  # 4. scale by counted --------------------------------------------------------
+  mutate(N = r * fjoldi / 1e3) %>%   # units of thousand
+  
+  # 5. trim towlength ----------------------------------------------------------
+  mutate(toglengd = if_else(toglengd > max.towlength, max.towlength, toglengd),
+         toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
+  
+  # 6. standardize by towlength ------------------------------------------------
+  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 4 miles
+  
+  # 7. calculate_biomass from numbers, length and a and b ----------------------
+  # 7.a get the length weight coefficients
+  left_join(tbl(con, "lwcoeff")) %>% 
+  # 7.b use Newton's law if lwcoefficient for species not specified
+  mutate(a = ifelse(is.na(a), 0.01, a),
+         b = ifelse(is.na(b), 3.00, b),
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
+  
+  # 8. summarise by station ----------------------------------------------------
+  group_by(synis_id, tognumer, ar, tegund) %>% 
+  summarise(N = sum(N, na.rm = TRUE),
+            B = sum(B, na.rm = TRUE)) %>% 
+  # Zero stations
+  mutate(N = ifelse(is.na(N), 0, N),
+         B = ifelse(is.na(B), 0, B)) %>% 
+  
+  # 9. filter stations ---------------------------------------------------------  
+  filter(tognumer %in% 1:39 | is.na(tognumer)) %>%
+  
+  # 10. summarise by strata ----------------------------------------------------
+  # 10.a  Get the strata for each station
+  left_join(tbl(con, "smbstationsstrata") %>% 
+              select(synis_id, strata = oldstrata)) %>% 
+  # 10.b group by year and strata and calculate number of stations, mean and sd
+  group_by(ar, strata) %>% 
+  summarise(sN  = n(),   # number of stations within strata
+            n_m  = mean(N, na.rm = TRUE),
+            n_d  = ifelse(n() == 1, mean(N, na.rm = TRUE) * std.cv, sd(N)),
+            b_m  = mean(B, na.rm = TRUE),
+            b_d  = ifelse(n() == 1, mean(B, na.rm = TRUE) * std.cv, sd(B))) %>% 
+  
+  # 11. raise to strata area ---------------------------------------------------
+  # 11.a get area of the strata
+  left_join(tbl(con, "oldstataarea") %>% 
+              select(strata = oldstrata, area = rall.area)) %>% 
+  # 11.b do the strata raising
+  #  area is above is in km2, here convert nm2
+  mutate(area  = area/1.852^2 / std.area) %>% 
+  mutate(n     = n_m  * area,
+         b     = b_m  * area) %>% 
+  
+  # ----------------------------------------------------------------------------
+  # Have to collect here because of calc_cv function in the year aggregate step
+  # TODO: Fix that, do internally in Oracle
+  collect(n = Inf) %>% 
+  
+  # 11. summarise by year ------------------------------------------------------
+  group_by(ar) %>%
+  summarise(n = sum(n, na.rm = TRUE),
+            # A la Höski
+            n.cv = calc_cv(n_m, n_d, area, sN),
+            b = sum(b, na.rm = TRUE),
+            # A la Höski
+            b.cv = calc_cv(b_m, b_d, area, sN)) %>% 
+  ungroup()
+```
+
+```{r}
+glimpse(d)
+```
+
+So we have a dataframe where each row is year and then the abundance and biomass indices and the cv. Lets plot the biomass indices:
+```{r}
+d %>% 
+  ggplot(aes(ar, b)) +
+  geom_pointrange(aes(ymin = b * (1 - b.cv),
+                      ymax = b * (1 + b.cv)),
+                  lwd = 1) +
+  expand_limits(y = 0) +
+  labs(x = NULL, y = NULL,
+       title = "Spring survey biomass indices")
+```
+
+
+
+
+__A double test__:
+```{r, echo = FALSE}
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
+vatican <-
+ Allaggroldsmbindex %>%
+ filter(species == 1,
+        svaedi == "Heild",
+        lengd == Length,
+        diurnal == 0,
+        fixed == 0) %>%
+ select(year = ar, cb = bio.staerri, cb.cv = cv.bio.staerri) %>%
+ mutate(source = "vatican") %>%
+ as_tibble()
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
+
+d %>% 
+  select(year = ar, cb = b, cb.cv = b.cv) %>% 
+  mutate(source = "tidy",
+         year = year + 0.2) %>% 
+  bind_rows(vatican) %>% 
+  ggplot(aes(year, cb)) +
+  geom_pointrange(aes(ymin = cb * (1 - cb.cv),
+                      ymax = cb * (1 + cb.cv),
+                      colour = source),
+                  lwd = 1) +
+  scale_colour_brewer(palette = "Set1") +
+  theme(legend.position = c(0.1, 0.8)) +
+  labs(x = NULL, y = NULL,
+       title = "Biomass indices",
+       subtitle = "Comparison of the official (vatican) and tidy")
+```
+

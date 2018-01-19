@@ -73,15 +73,15 @@ ___
 
 ### Tuesday, 2018-01-16
 
-* 09:00 - ??:00
+* 09:00 - 12:00
     
     * [Statistics in R](pre_statistics.html) -bte
-    * ?? [Working with strings](404page.html) - bte
 
 ### Friday, 2018-01-19
 
 * 13:00 - "Happy hour"
-    * [To be determined](404page.html)
+    * [Case example: Standardized survey indices](pre_case_smx.html)
+    * [Working with git and gihub](404page.html)
     * [Next steps](404page.html)
 
 ## Part II
