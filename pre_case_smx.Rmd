@@ -1,18 +1,23 @@
 ---
-# Length based indices via mar
+title: "Length based indices via mar"
 ---
+
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE,
                       warning = FALSE)
 ```
 
+**NOTE**: After the lecture today, adjusted code to take into account stations with zero catch. The code only works for one species at the time.
+
+**TODO**: There is some bug related to the 2009 data calculation that needs fixing.
+
 # Preamble
 ___
 
 This case example demonstrates how to calculate standardized survey indices from SMB using the tidyverse approach.
 
-In principle the method is described in [Fjölrit 131](https://www.hafogvatn.is/static/research/files/fjolrit-131pdf). The pseudocode is something like:
+In principle the method is described in [Fjölrit 131](https://www.hafogvatn.is/static/research/files/fjolrit-131pdf). The pseudo-code is something like:
 ```
 1.  get survey stations %>%
 2.  get length data %>%
@@ -40,11 +45,11 @@ con <- connect_mar()
 
 ## Additonal tables in mar
 
-In order to calculate standardized survey indices we need in addition to the tables in mar information on:
+In order to calculate standardized survey indices within Oracle we need in addition to the tables in mar Oracle tables on:
 
 * Length-weight coefficients
 * What strata each tow belongs to
-* The area of the stratas
+* The area of the strata
 
 For this case example these tables have been made available to all:
 ```{r}
@@ -55,17 +60,21 @@ glimpse(tbl_mar(con, "ops$einarhj.oldstrataarea"))
 
 The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata.
 
+If one is not interested in running the code within Oracle one would need to supply the above tables as an r-dataframe. The side effect, one would need to change the code below such that anytime an Oracle-table is addressed one would need to add the `collect`-function.
+
 ## Select a species
 
 Lets select a species to work with and the length above which we want to obtain
 the standardized survey indices:
 ```{r}
-Species <- 3                       # Select a species
-Length.min <- 5                    # Minimum length for indices calculation
-Length.max <- 500                  # Maximum length for indices calculation
+Species <- 23                     # Select a species
+Length.min <- 5                   # Minimum length for indices calculation
+Length.max <- 500                 # Maximum length for indices calculation
 ```
 
-Some constants used in the standarization process:
+## Some constants
+
+Some constants used in the standardization process (you can deviate from them if you want):
 ```{r}
 std.cv        <- 1             # The cv if only one station in a strata
 std.towlength <- 4             # Standard tow length is 4 nautical miles
@@ -118,8 +127,8 @@ d <-
                      lengd >= Length.min,
                      lengd < Length.max) %>% 
               group_by(synis_id, tegund, lengd) %>% 
-              summarise(fjoldi = sum(fjoldi, na.rm = TRUE)) %>% 
-              ungroup()) %>% 
+              summarise(fjoldi = sum(fjoldi, na.rm = TRUE))) %>% 
+              ungroup() %>% 
   
   # 3. get count data ----------------------------------------------------------
   left_join(lesa_numer(con) %>% 
@@ -128,7 +137,7 @@ d <-
   
   # 0. A temporary fix, for zero stations --------------------------------------
   #     TODO: Find a more permanent solution so scripts works for more than
-  #           one species
+  #           one species (via group_by( ..., tegund))
   mutate(tegund = if_else(is.na(tegund), Species, tegund),
          lengd  = if_else(is.na(tegund), Length.min, lengd),
          fjoldi = if_else(is.na(tegund), 0, fjoldi),
@@ -153,6 +162,9 @@ d <-
          B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
   
   # 8. summarise by station ----------------------------------------------------
+  # NOTE: here is the first step where statistics by length is dropped
+  #       some (minor) recoding above would be needed if one were to take things
+  #       forward by each length class
   group_by(synis_id, tognumer, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
@@ -186,6 +198,7 @@ d <-
          b     = b_m  * area) %>% 
   
   # ----------------------------------------------------------------------------
+  # Up to now we only have been operating within Oracle. I.e. sql-scripts via R.
   # Have to collect here because of calc_cv function in the year aggregate step
   # TODO: Fix that, do internally in Oracle
   collect(n = Inf) %>% 
@@ -212,18 +225,18 @@ glimpse(d)
 So we have a dataframe where each row is year and then the abundance and biomass indices and the cv. Lets plot the biomass indices:
 ```{r}
 d %>% 
-  ggplot(aes(ar, b)) +
-  geom_pointrange(aes(ymin = b * (1 - b.cv),
-                      ymax = b * (1 + b.cv)),
-                  lwd = 1) +
+  ggplot(aes(ar + 3/12, b)) +
+  geom_point() +
+  geom_linerange(aes(ymin = b * (1 - b.cv),
+                      ymax = b * (1 + b.cv))) +
   expand_limits(y = 0) +
   labs(x = NULL, y = NULL,
        title = "Spring survey biomass indices")
 ```
 
-# Double check
+# Meeting with the Pope
 
-Below we make a comparison with calculation made by Pope Husky, just as a double check
+Below we make a comparison with results based on Pope Husky's code, just as a double check.
 
 ```{r, echo = FALSE}
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
@@ -234,7 +247,7 @@ vatican <-
         diurnal == 0,
         fixed == 0) %>%
  select(ar, lengd, b = bio.staerri, b.cv = cv.bio.staerri) %>%
- mutate(source = "vatican") %>%
+ mutate(source = "Vatican") %>%
  as_tibble()
 vatican <-
   vatican %>% 
@@ -243,19 +256,35 @@ detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.r
 
 d %>% 
   mutate(source = "tidy",
-         ar = ar + 0.2) %>% 
+         ar = ar + 3/12) %>% 
   bind_rows(vatican) %>% 
-  ggplot(aes(ar, b)) +
+  ggplot(aes(ar, b, colour = source)) +
+  geom_point() +
   geom_pointrange(aes(ymin = b * (1 - b.cv),
-                      ymax = b * (1 + b.cv),
-                      colour = source),
-                  lwd = 1) +
+                      ymax = b * (1 + b.cv))) +
   scale_colour_brewer(palette = "Set1") +
-  theme(legend.position = c(0.1, 0.8)) +
+  theme(legend.position = c(0.25, 0.8)) +
+  expand_limits(y = 0) +
   labs(x = NULL, y = NULL,
        title = "Biomass indices",
-       subtitle = "Comparison of the official (vatican) and tidy")
+       subtitle = "Comparison of the orthodoxy (Vatican) and tidy")
 ```
+
+Besides that tidy and the Vatican are not operating in the same time zone (one has argued that tidy operates under the Greek-orthodox time zone, but it seems inverse) the stuff on the y-axis looks reasonably similar.
+
+If you want to take a look the Vatican code check out the r-scripts in the following directory.
+
+```{r}
+dir("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB",
+    full.names = TRUE)
+```
+
+The backbone script is:
+```{r}
+parse("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Indices.r")
+```
+
+with the workhorse being the Calc.index-function.
 
 # Appendix
 
@@ -279,4 +308,6 @@ dbWriteTable(con, name = "OLDSTRATAAREA", value = d, overwrite = TRUE)
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
 # sql("grant select on oldstrataarea to h_fiskar_skoda"
 ```
+
+
 
