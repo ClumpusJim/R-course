@@ -288,7 +288,35 @@ with the workhorse being the Calc.index-function.
 
 # Appendix
 
-Code used to generate the additional tables in mar:
+Documentation of the code used to generate the additional tables in mar.
+
+## Old strata
+
+```{r, eval = FALSE}
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
+d <- 
+  data_frame(oldstrata = attributes(STRATAS)$names %>% as.integer(),
+             area = attributes(STRATAS)$area,
+             rall.area = attributes(STRATAS)$rall.area)
+dbWriteTable(con, name = "OLDSTRATAAREA", value = d, overwrite = TRUE)
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
+# sql: grant select on oldstrataarea to h_fiskar_skoda
+```
+
+## New strata
+
+```{r, eval = FALSE}
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/NewStratas/.RData")
+d <- 
+  data_frame(newstrata = 1:length(attributes(STRATAS)$names),
+             area = attributes(STRATAS)$area,
+             rall.area = attributes(STRATAS)$rall.area)
+dbWriteTable(con, name = "NEWSTRATAAREA", value = d, overwrite = FALSE)
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/NewStratas/.RData")
+# sql: grant select on newstrataarea to h_fiskar_skoda
+```
+
+## SMB
 
 ```{r, eval = FALSE}
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
@@ -297,16 +325,20 @@ d <-
   select(synis_id = synis.id, oldstrata, newstrata)
 dbWriteTable(con, name = "SMBSTATIONSSTRATA", value = d, overwrite = TRUE)
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
-# sql("grant select on smbstationsstrata to h_fiskar_skoda")
+# sql: grant select on smbstationsstrata to h_fiskar_skoda
+```
 
-attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
+## SMH
+
+```{r, eval = FALSE}
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/stations.rdata")
 d <- 
-  data_frame(oldstrata = attributes(STRATAS)$names %>% as.integer(),
-             area = attributes(STRATAS)$area,
-             rall.area = attributes(STRATAS)$rall.area)
-dbWriteTable(con, name = "OLDSTRATAAREA", value = d, overwrite = TRUE)
-detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/OldStratas/.RData")
-# sql("grant select on oldstrataarea to h_fiskar_skoda"
+  haustrall.all.st %>%
+  select(synis_id = synis.id, newstrata) %>% 
+  mutate(newstrata = as.integer(newstrata))
+dbWriteTable(con, name = "SMHSTATIONSSTRATA", value = d, overwrite = FALSE)
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/stations.rdata")
+# sql: grant select on smhstationsstrata to h_fiskar_skoda
 ```
 
 
