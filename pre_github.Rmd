@@ -1,0 +1,16 @@
+---
+title: "Getting started with github"
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE)
+```
+
+An on-hands class-demonstration. Some useful links are:
+
+* Quick-overview
+    * [Getting started on github](https://guides.github.com/activities/hello-world)
+    * [RStudio and github](http://www.datasurg.net/2015/07/13/rstudio-and-github)
+* More details
+    * [Happy Git and GitHub for the useR](http://happygitwithr.com)

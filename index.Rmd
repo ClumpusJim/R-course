@@ -81,7 +81,7 @@ ___
 
 * 13:00 - "Happy hour"
     * [Case example: Standardized survey indices](pre_case_smx.html)
-    * [Working with git and gihub](404page.html)
+    * [Getting started with gihub](pre_github.html)
     * [Next steps](404page.html)
 
 ## Part II
