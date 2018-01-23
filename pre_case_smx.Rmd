@@ -234,9 +234,11 @@ d %>%
        title = "Spring survey biomass indices")
 ```
 
+NOTE: Bug in the code, no cv is returned for the year 2009.
+
 # Meeting with the Pope
 
-Below we make a comparison with results based on Pope Husky's code, just as a double check.
+Below a comparison with results based on Pope Husky's code, just as a double check.
 
 ```{r, echo = FALSE}
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
@@ -272,19 +274,224 @@ d %>%
 
 Besides that tidy and the Vatican are not operating in the same time zone (one has argued that tidy operates under the Greek-orthodox time zone, but it seems inverse) the stuff on the y-axis looks reasonably similar.
 
-If you want to take a look the Vatican code check out the r-scripts in the following directory.
+If you want to take a look the Vatican code check out the following r-scripts:
 
 ```{r}
-dir("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB",
+dir("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB", pattern = "*.[rR]$",
     full.names = TRUE)
 ```
 
-The backbone script is:
-```{r}
+The backbone script is found in:
+```{r, eval = FALSE}
+# Not run
 parse("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Indices.r")
 ```
 
 with the workhorse being the Calc.index-function.
+
+# Homework
+
+<div class="panel panel-warning">
+<div class="panel-heading">Exercise</div>
+<div class="panel-body">
+
+Homework **only** for those with some inside knowledge of the fall survey indices.
+
+The fall survey stations can be filtered out of the station table by recognizing that:
+
+* synaflokkur is 35
+* gear (veidarfaeri) is 77 (shallow) and 78 (deep)
+* towid (tognumer) are less than 80
+* the sweep area of gear 78 is set to 1.25 times that of the shallow gear
+
+The fall survey indices are stratified according to "newstrata", check out:
+```{r, eval = FALSE}
+# Not run
+tbl_mar(con, "ops$einarhj.smhstationsstrata")
+```
+
+The area of the newstrata are found in:
+```{r, eval = FALSE}
+# Not run
+tbl_mar(con, "ops$einarhj.newstrataarea")
+```
+
+Make minimum adjustment to the code to calculate the fall biomass survey indices. The resulting plot should look something like:
+
+```{r, echo = FALSE}
+# The fall survey
+d <-  
+  # 1. get survey stations -----------------------------------------------------
+  lesa_stodvar(con) %>% 
+  filter(synaflokkur == 35,
+         veidarfaeri %in% c(77, 78),
+         ar > 1995,
+         !ar %in% 2011, 
+         tognumer < 80) %>% 
+  #mutate(r_sweep = if_else(veidarfaeri == 78, 1.25, 1)) %>% 
+  # NOTE: in /net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/stations.r
+  # Additional filters are:
+  #     ar > 1995, !ar %in% 2011, tognumer < 80) %>%
+  # then we have this: 
+  #     mutate(mult = if_else(veidarfaeri == 78, 1.25, 1))
+  #     mutate(index = reitur*100+tognumer)
+  # handle that here or below below??
+  # ALSO:
+  #      i <- is.na(haustrall.all.st$kl.kastad)
+  #      if(any(i)) haustrall.all.st$kl.kastad[i] <- 12
+  #      haustrall.all.st <- inside.reg.bcbreytt(haustrall.all.st)
+
+  select(synis_id, ar, gid = veidarfaeri, toglengd, reitur, tognumer) %>% 
+  
+  # 2. get length data ---------------------------------------------------------
+  left_join(lesa_lengdir(con) %>% 
+              filter(tegund %in% Species,
+                     lengd >= Length.min,
+                     lengd < Length.max) %>% 
+              group_by(synis_id, tegund, lengd) %>% 
+              summarise(fjoldi = sum(fjoldi, na.rm = TRUE))) %>% 
+              ungroup() %>% 
+  
+  # 3. get count data ----------------------------------------------------------
+  left_join(lesa_numer(con) %>% 
+              mutate(r =  ifelse(fj_maelt != 0, 1 + fj_talid/fj_maelt, 1)) %>% 
+              select(synis_id, tegund, r)) %>% 
+  
+  # 0. A temporary fix, for zero stations --------------------------------------
+  #     TODO: Find a more permanent solution so scripts works for more than
+  #           one species (via group_by( ..., tegund))
+  mutate(tegund = if_else(is.na(tegund), Species, tegund),
+         lengd  = if_else(is.na(tegund), Length.min, lengd),
+         fjoldi = if_else(is.na(tegund), 0, fjoldi),
+         r      = if_else(is.na(tegund), 1, r)) %>% 
+  
+  # 4. scale by counted --------------------------------------------------------
+  mutate(N = r * fjoldi / 1e3) %>%  # units of thousand
+
+  # X. scale by gear
+  #  one gear has a wider sweep than the others
+  mutate(N = if_else(gid == 78, 1.25, 1) * N) %>%
+
+  
+  # 5. trim towlength ----------------------------------------------------------
+  mutate(toglengd = if_else(toglengd > max.towlength, max.towlength, toglengd),
+         toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
+  
+  # 6. standardize by towlength ------------------------------------------------
+  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 4 miles
+  
+  # 7. calculate_biomass from numbers, length and a and b ----------------------
+  # 7.a get the length weight coefficients
+  left_join(tbl_mar(con, "ops$einarhj.lwcoeff")) %>% 
+  # 7.b use Newton's law if lwcoefficient for species not specified
+  mutate(a = ifelse(is.na(a), 0.01, a),
+         b = ifelse(is.na(b), 3.00, b),
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
+  
+  # 8. summarise by station ----------------------------------------------------
+  # NOTE: here is the first step where statistics by length is dropped
+  #       some (minor) recoding above would be needed if one were to take things
+  #       forward by each length class
+  group_by(synis_id, tognumer, ar) %>% 
+  summarise(N = sum(N, na.rm = TRUE),
+            B = sum(B, na.rm = TRUE)) %>% 
+  # Zero stations
+  mutate(N = ifelse(is.na(N), 0, N),
+         B = ifelse(is.na(B), 0, B)) %>% 
+  
+  # 9. filter stations ---------------------------------------------------------  
+  # filter(tognumer %in% 1:39 | is.na(tognumer)) %>%
+  
+  # 10. summarise by strata ----------------------------------------------------
+  # 10.a  Get the strata for each station
+  left_join(tbl_mar(con, "ops$einarhj.smhstationsstrata") %>% 
+              select(synis_id, strata = newstrata)) %>% 
+  # 10.b group by year and strata and calculate number of stations, mean and sd
+  group_by(ar, strata) %>% 
+  summarise(sN  = n(),   # number of stations within strata
+            n_m  = mean(N, na.rm = TRUE),
+            n_d  = ifelse(n() == 1, mean(N, na.rm = TRUE) * std.cv, sd(N)),
+            b_m  = mean(B, na.rm = TRUE),
+            b_d  = ifelse(n() == 1, mean(B, na.rm = TRUE) * std.cv, sd(B))) %>% 
+  
+  # 11. raise to strata area ---------------------------------------------------
+  # 11.a get area of the strata
+  left_join(tbl_mar(con, "ops$einarhj.newstrataarea") %>% 
+              select(strata = newstrata, area = rall.area)) %>% 
+  # 11.b do the strata raising
+  #  area is above is in km2, here convert nm2
+  mutate(area  = area/1.852^2 / std.area) %>% 
+  mutate(n     = n_m  * area,
+         b     = b_m  * area) %>% 
+  
+  # ----------------------------------------------------------------------------
+  # Up to now we only have been operating within Oracle. I.e. sql-scripts via R.
+  # Have to collect here because of calc_cv function in the year aggregate step
+  # TODO: Fix that, do internally in Oracle
+  collect(n = Inf) %>% 
+  
+  # 11. summarise by year ------------------------------------------------------
+  group_by(ar) %>%
+  summarise(n = sum(n, na.rm = TRUE),
+            # A la Höski
+            n.cv = calc_cv(n_m, n_d, area, sN),
+            b = sum(b, na.rm = TRUE),
+            # A la Höski
+            b.cv = calc_cv(b_m, b_d, area, sN)) %>% 
+  ungroup()
+
+d %>% 
+  ggplot(aes(ar, b)) +
+  geom_point() +
+  geom_pointrange(aes(ymin = b * (1 - b.cv),
+                      ymax = b * (1 + b.cv))) +
+  scale_colour_brewer(palette = "Set1") +
+  theme(legend.position = c(0.25, 0.8)) +
+  expand_limits(y = 0) +
+  labs(x = NULL, y = NULL,
+       title = "Biomass indices",
+       subtitle = "Comparison of the orthodoxy (Vatican) and tidy")
+```
+
+
+```{r, echo = FALSE, eval = FALSE}
+# Comparison with the Vatican
+attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/Allaggrsmhindex.rdata")
+vatican <-
+ Allaggrsmhindex %>%
+ filter(species == Species,
+        svaedi == "Heild",
+        diurnal == 0,
+        fixed == 0,
+        skipShallow == 0) %>%
+ select(ar, lengd, b = bio.staerri, b.cv = cv.bio.staerri) %>%
+ mutate(source = "Vatican") %>%
+ as_tibble()
+vatican <-
+  vatican %>% 
+  filter(lengd == max(min(lengd), Length.min))
+detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/Allaggrsmhindex.rdata")
+
+d %>% 
+  mutate(source = "tidy",
+         ar = ar + 3/12) %>% 
+  bind_rows(vatican) %>% 
+  ggplot(aes(ar, b, colour = source)) +
+  geom_point() +
+  geom_pointrange(aes(ymin = b * (1 - b.cv),
+                      ymax = b * (1 + b.cv))) +
+  scale_colour_brewer(palette = "Set1") +
+  theme(legend.position = c(0.25, 0.8)) +
+  expand_limits(y = 0) +
+  labs(x = NULL, y = NULL,
+       title = "Biomass indices",
+       subtitle = "Comparison of the orthodoxy (Vatican) and tidy")
+```
+
+NOTE: Bug in the code, no cv returned for year 2017
+
+</div>
+</div>
 
 # Appendix
 
