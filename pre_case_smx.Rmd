@@ -168,7 +168,7 @@ d <-
   group_by(synis_id, tognumer, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
-  # Zero stations
+  # Zero stations - THOUGHT THIS STEP SHOULD BE REDUNDANT
   mutate(N = ifelse(is.na(N), 0, N),
          B = ifelse(is.na(B), 0, B)) %>% 
   
