@@ -68,24 +68,9 @@ If one is not interested in running the code within Oracle one would need to sup
 Lets select a species to work with and the length above which we want to obtain
 the standardized survey indices:
 ```{r}
-Species <- 22                     # Select a species
+Species <- 1                      # Select a species
 Length.min <- 5                   # Minimum length for indices calculation
 Length.max <- 500                 # Maximum length for indices calculation
-```
-
-## Some constants
-
-Some constants used in the standardization process (you can deviate from them if you want):
-```{r}
-std.cv        <- 1             # The cv if only one station in a strata
-std.towlength <- 4             # Standard tow length for SMB is 4 nautical miles
-std.width     <- 17            # Standard sweep width in meters
-# Standard area swept, units of square nautical miles
-#   (1852 meters / nm)
-std.area <- std.towlength * std.width / 1852    # This applies to SMB
-
-min.towlength <- 2             # Minimum "acceptable" towlength
-max.towlength <- 8             # Maximum "acceptable" towlength
 ```
 
 A little helper function:
@@ -139,6 +124,21 @@ Calculating stratified survey indices is done in four steps:
     - Estimate the weight of fish in each length class from the length-weight coefficient
 * B. Summarise abundance and weight for each station 
 * C. 
+
+
+Some constants used in the standardization process for SMB (you can deviate from them if you want):
+```{r}
+std.cv        <- 1             # The cv if only one station in a strata
+std.towlength <- 4             # Standard tow length for SMB is 4 nautical miles
+std.width     <- 17 / 1852     # Standard sweep width in nautical miles
+
+min.towlength <- 2             # Minimum "acceptable" towlength
+max.towlength <- 8             # Maximum "acceptable" towlength
+
+Synaflokkur <- 30
+```
+
+
 ```{r}
 # ------------------------------------------------------------------------------
 # A. Data gathering
@@ -146,7 +146,7 @@ Calculating stratified survey indices is done in four steps:
 by.length <-  
   # 1. get survey stations -----------------------------------------------------
   lesa_stodvar(con) %>% 
-  filter(synaflokkur == 30, veidarfaeri == 73) %>% 
+  filter(synaflokkur == Synaflokkur) %>% 
   select(synis_id, ar, toglengd, reitur, tognumer, veidarfaeri) %>% 
   
   # 2. get length data ---------------------------------------------------------
@@ -176,7 +176,9 @@ by.length <-
          toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
   
   # 6. standardize by towlength ------------------------------------------------
-  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 4 miles
+  mutate(N = N /toglengd * std.towlength) %>%       # standardize to per 4 miles
+  # standardize to area swept
+  mutate(N = N / if_else(veidarfaeri == 78, 1.25 * std.width, std.width)) %>% 
   
   # 7. calculate_biomass from numbers, length and a and b ----------------------
   # 7.a get the length weight coefficients
@@ -185,7 +187,6 @@ by.length <-
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
          B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
-
 
 # ------------------------------------------------------------------------------
 # B. Summarise abundance and biomass by station
@@ -198,13 +199,12 @@ by.station <-
   # NOTE: here is the first step where statistics by length is dropped
   #       some (minor) recoding above would be needed if one were to take things
   #       forward by each length class
-  group_by(synis_id, tognumer, tegund, ar) %>% 
+  group_by(synis_id, tognumer, veidarfaeri, tegund, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
   # Zero stations - THOUGHT THIS STEP SHOULD BE REDUNDANT
   mutate(N = ifelse(is.na(N), 0, N),
          B = ifelse(is.na(B), 0, B))
-
 
 # ------------------------------------------------------------------------------
 # C. Calculate mean and standard deviation of abundance and biomass of stations
@@ -232,12 +232,12 @@ by.strata <-
   # 11. raise to strata area ---------------------------------------------------
   # 11.a get area of the strata
   left_join(tbl_mar(con, "ops$einarhj.oldstrataarea") %>% 
-              select(strata = oldstrata, area = rall.area)) %>% 
+              select(strata = oldstrata, area = rall.area) %>% 
+              #  area is above is in km2, here convert nm2
+              mutate(area = area / 1.852^2)) %>% 
   # 11.b do the strata raising
-  #  area is above is in km2, here convert nm2
-  mutate(area  = area/1.852^2 / std.area) %>% 
-  mutate(n     = n_m  * area,
-         b     = b_m  * area) 
+  mutate(n     = n_m  * area / std.towlength,
+         b     = b_m  * area / std.towlength) 
 
 # ------------------------------------------------------------------------------
 # D. Summarise data by year
@@ -375,26 +375,26 @@ tbl_mar(con, "ops$einarhj.newstrataarea")
 Make minimum adjustment to the code to calculate the fall biomass survey indices. The resulting plot should look something like:
 
 ```{r}
-std.cv        <- 1             # The cv if only one station in a strata
-std.towlength <- 3             # Standard tow length for SMH is 3 nautical miles
-std.width     <- 17            # Standard sweep width in meters
-# Standard area swept, units of square nautical miles
-#   (1852 meters / nm)
-std.area <- std.towlength * std.width / 1852    # This applies for gear 77
+Species <- 23
+#std.cv        <- 1             # The cv if only one station in a strata
+std.towlength <- 3             # Standard tow length for SMB is 4 nautical miles
+#std.width     <- 17 / 1852     # Standard sweep width in nautical miles
 
-min.towlength <- 2             # Minimum "acceptable" towlength
-max.towlength <- 8             # Maximum "acceptable" towlength
+#min.towlength <- 2             # Minimum "acceptable" towlength
+#max.towlength <- 8             # Maximum "acceptable" towlength
+
+Synaflokkur <- 35
+```
 
 
+```{r, echo = FALSE}
 # ------------------------------------------------------------------------------
 # A. Data gathering
 
 by.length <-  
   # 1. get survey stations -----------------------------------------------------
   lesa_stodvar(con) %>% 
-  filter(synaflokkur == 35,
-         ar > 1995,
-         !ar %in% 2011) %>% 
+  filter(synaflokkur == Synaflokkur) %>% 
   select(synis_id, ar, toglengd, reitur, tognumer, veidarfaeri) %>% 
   
   # 2. get length data ---------------------------------------------------------
@@ -424,7 +424,9 @@ by.length <-
          toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
   
   # 6. standardize by towlength ------------------------------------------------
-  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 3 miles
+  mutate(N = N /toglengd * std.towlength) %>%       # standardize to per 4 miles
+  # standardize to area swept
+  mutate(N = N / if_else(veidarfaeri == 78, 1.25 * std.width, std.width)) %>% 
   
   # 7. calculate_biomass from numbers, length and a and b ----------------------
   # 7.a get the length weight coefficients
@@ -433,7 +435,7 @@ by.length <-
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
          B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
-  
+
 # ------------------------------------------------------------------------------
 # B. Summarise abundance and biomass by station
 
@@ -452,7 +454,6 @@ by.station <-
   mutate(N = ifelse(is.na(N), 0, N),
          B = ifelse(is.na(B), 0, B))
 
-
 # ------------------------------------------------------------------------------
 # C. Calculate mean and standard deviation of abundance and biomass of stations
 #    within each strata and raise estimates by the area of the strata
@@ -463,9 +464,6 @@ by.strata <-
   
   # 9. filter stations ---------------------------------------------------------  
   filter(tognumer < 80 | is.na(tognumer)) %>%
-  
-  # Specific for SMH -----------------------------------------------------------
-  
   
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
@@ -482,12 +480,12 @@ by.strata <-
   # 11. raise to strata area ---------------------------------------------------
   # 11.a get area of the strata
   left_join(tbl_mar(con, "ops$einarhj.newstrataarea") %>% 
-              select(strata = newstrata, area = rall.area)) %>% 
+              select(strata = newstrata, area = rall.area) %>% 
+              #  area is above is in km2, here convert nm2
+              mutate(area = area / 1.852^2)) %>% 
   # 11.b do the strata raising
-  #  area is above is in km2, here convert nm2
-  mutate(area  = area/1.852^2 / std.area) %>% 
-  mutate(n     = n_m  * area,
-         b     = b_m  * area) 
+  mutate(n     = n_m  * area / std.towlength,
+         b     = b_m  * area / std.towlength) 
 
 # ------------------------------------------------------------------------------
 # D. Summarise data by year
@@ -520,7 +518,8 @@ by.year <-
 ```
 
 
-```{r, echo = FALSE, eval = FALSE}
+
+```{r, echo = FALSE, eval = TRUE}
 # Comparison with the Vatican
 attach("/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/Allaggrsmhindex.rdata")
 vatican <-
