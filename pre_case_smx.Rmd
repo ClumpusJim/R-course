@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 **NOTE**: After the lecture today, adjusted code to take into account stations with zero catch. The code only works for one species at the time.
 
-**TODO**: There is some bug related to the 2009 data calculation that needs fixing.
+**TODO**: There is some issues related to the 2009 data calculation of the cv that needs closer inspection.
 
 # Preamble
 ___
@@ -18,6 +18,7 @@ ___
 This case example demonstrates how to calculate standardized survey indices from SMB using the tidyverse approach.
 
 In principle the method is described in [Fjölrit 131](https://www.hafogvatn.is/static/research/files/fjolrit-131pdf). The pseudo-code is something like:
+
 ```
 1.  get survey stations %>%
 2.  get length data %>%
@@ -43,7 +44,7 @@ con <- connect_mar()
 ```
 
 
-## Additonal tables in mar
+## Additional tables in mar
 
 In order to calculate standardized survey indices within Oracle we need in addition to the tables in mar Oracle tables on:
 
@@ -67,7 +68,7 @@ If one is not interested in running the code within Oracle one would need to sup
 Lets select a species to work with and the length above which we want to obtain
 the standardized survey indices:
 ```{r}
-Species <- 23                     # Select a species
+Species <- 22                     # Select a species
 Length.min <- 5                   # Minimum length for indices calculation
 Length.max <- 500                 # Maximum length for indices calculation
 ```
@@ -77,11 +78,11 @@ Length.max <- 500                 # Maximum length for indices calculation
 Some constants used in the standardization process (you can deviate from them if you want):
 ```{r}
 std.cv        <- 1             # The cv if only one station in a strata
-std.towlength <- 4             # Standard tow length is 4 nautical miles
+std.towlength <- 4             # Standard tow length for SMB is 4 nautical miles
 std.width     <- 17            # Standard sweep width in meters
 # Standard area swept, units of square nautical miles
 #   (1852 meters / nm)
-std.area <- std.towlength * std.width / 1852
+std.area <- std.towlength * std.width / 1852    # This applies to SMB
 
 min.towlength <- 2             # Minimum "acceptable" towlength
 max.towlength <- 8             # Maximum "acceptable" towlength
@@ -109,17 +110,44 @@ calc_cv <- function(m, s, area, n) {
   
   return(cv)
 }
+
+get_count_ratio <- function(lengdir){
+
+  ratio <-
+    lesa_numer(lengdir$src) %>%
+    dplyr::mutate(r = ifelse(fj_talid==0 | is.na(fj_talid),
+                             1,
+                             1 + fj_talid / ifelse(fj_maelt == 0 | is.na(fj_maelt), 1, fj_maelt))) %>%
+    dplyr::select(synis_id, tegund, r)
+
+  lengdir %>%
+    dplyr::left_join(ratio) %>% 
+    # for zero stations
+    mutate(r = ifelse(is.na(r), 1, r))
+}
 ```
 
 # The code
 ___
 
+Calculating stratified survey indices is done in four steps:
+
+* A. Data gathering and standardization for each length class
+    - Gather the survey, length and counted data for a species of interest.
+    - Raise the numbers measured with those counted for each length bin, giving the number of fish caugth in each length bin per station (number of fish caught).
+    - Trim extreme tow lengths and then standardize the number of fish caught at each station to a standard towlength (number of fish per standard tow length in each length class).
+    - Estimate the weight of fish in each length class from the length-weight coefficient
+* B. Summarise abundance and weight for each station 
+* C. 
 ```{r}
-d <-  
+# ------------------------------------------------------------------------------
+# A. Data gathering
+
+by.length <-  
   # 1. get survey stations -----------------------------------------------------
   lesa_stodvar(con) %>% 
   filter(synaflokkur == 30, veidarfaeri == 73) %>% 
-  select(synis_id, ar, toglengd, reitur, tognumer) %>% 
+  select(synis_id, ar, toglengd, reitur, tognumer, veidarfaeri) %>% 
   
   # 2. get length data ---------------------------------------------------------
   left_join(lesa_lengdir(con) %>% 
@@ -130,18 +158,15 @@ d <-
               summarise(fjoldi = sum(fjoldi, na.rm = TRUE))) %>% 
               ungroup() %>% 
   
-  # 3. get count data ----------------------------------------------------------
-  left_join(lesa_numer(con) %>% 
-              mutate(r =  ifelse(fj_maelt != 0, 1 + fj_talid/fj_maelt, 1)) %>% 
-              select(synis_id, tegund, r)) %>% 
-  
   # 0. A temporary fix, for zero stations --------------------------------------
   #     TODO: Find a more permanent solution so scripts works for more than
   #           one species (via group_by( ..., tegund))
   mutate(tegund = if_else(is.na(tegund), Species, tegund),
-         lengd  = if_else(is.na(tegund), Length.min, lengd),
-         fjoldi = if_else(is.na(tegund), 0, fjoldi),
-         r      = if_else(is.na(tegund), 1, r)) %>% 
+         lengd  = if_else(is.na(lengd), Length.min, lengd),
+         fjoldi = if_else(is.na(fjoldi), 0, fjoldi)) %>% 
+  
+  # 3. get count data ----------------------------------------------------------
+  get_count_ratio() %>% 
   
   # 4. scale by counted --------------------------------------------------------
   mutate(N = r * fjoldi / 1e3) %>%   # units of thousand
@@ -159,18 +184,35 @@ d <-
   # 7.b use Newton's law if lwcoefficient for species not specified
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
-         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
+
+
+# ------------------------------------------------------------------------------
+# B. Summarise abundance and biomass by station
+
+by.station <- 
+  
+  by.length %>% 
   
   # 8. summarise by station ----------------------------------------------------
   # NOTE: here is the first step where statistics by length is dropped
   #       some (minor) recoding above would be needed if one were to take things
   #       forward by each length class
-  group_by(synis_id, tognumer, ar) %>% 
+  group_by(synis_id, tognumer, tegund, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
   # Zero stations - THOUGHT THIS STEP SHOULD BE REDUNDANT
   mutate(N = ifelse(is.na(N), 0, N),
-         B = ifelse(is.na(B), 0, B)) %>% 
+         B = ifelse(is.na(B), 0, B))
+
+
+# ------------------------------------------------------------------------------
+# C. Calculate mean and standard deviation of abundance and biomass of stations
+#    within each strata and raise estimates by the area of the strata
+
+by.strata <-
+  
+  by.station %>% 
   
   # 9. filter stations ---------------------------------------------------------  
   filter(tognumer %in% 1:39 | is.na(tognumer)) %>%
@@ -180,7 +222,7 @@ d <-
   left_join(tbl_mar(con, "ops$einarhj.smbstationsstrata") %>% 
               select(synis_id, strata = oldstrata)) %>% 
   # 10.b group by year and strata and calculate number of stations, mean and sd
-  group_by(ar, strata) %>% 
+  group_by(tegund, ar, strata) %>% 
   summarise(sN  = n(),   # number of stations within strata
             n_m  = mean(N, na.rm = TRUE),
             n_d  = ifelse(n() == 1, mean(N, na.rm = TRUE) * std.cv, sd(N)),
@@ -195,16 +237,29 @@ d <-
   #  area is above is in km2, here convert nm2
   mutate(area  = area/1.852^2 / std.area) %>% 
   mutate(n     = n_m  * area,
-         b     = b_m  * area) %>% 
+         b     = b_m  * area) 
+
+# ------------------------------------------------------------------------------
+# D. Summarise data by year
+
+by.year <- 
+  
+  by.strata %>% 
+  
   
   # ----------------------------------------------------------------------------
   # Up to now we only have been operating within Oracle. I.e. sql-scripts via R.
   # Have to collect here because of calc_cv function in the year aggregate step
   # TODO: Fix that, do internally in Oracle
   collect(n = Inf) %>% 
+
+  
+  # ----------------------------------------------------------------------------
+  # some data fall outside strata, drop them - needs some double checking of code
+  drop_na() %>% 
   
   # 11. summarise by year ------------------------------------------------------
-  group_by(ar) %>%
+  group_by(tegund, ar) %>%
   summarise(n = sum(n, na.rm = TRUE),
             # A la Höski
             n.cv = calc_cv(n_m, n_d, area, sN),
@@ -215,26 +270,27 @@ d <-
 ```
 
 
+
 # The results
 ___
 
 ```{r}
-glimpse(d)
+glimpse(by.year)
 ```
 
 So we have a dataframe where each row is year and then the abundance and biomass indices and the cv. Lets plot the biomass indices:
 ```{r}
-d %>% 
+by.year %>% 
   ggplot(aes(ar + 3/12, b)) +
   geom_point() +
   geom_linerange(aes(ymin = b * (1 - b.cv),
                       ymax = b * (1 + b.cv))) +
   expand_limits(y = 0) +
   labs(x = NULL, y = NULL,
-       title = "Spring survey biomass indices")
+       title = "Spring survey biomass indices") +
+  facet_wrap(~ tegund, scale = "free_y")
 ```
 
-NOTE: Bug in the code, no cv is returned for the year 2009.
 
 # Meeting with the Pope
 
@@ -256,7 +312,7 @@ vatican <-
   filter(lengd == max(min(lengd), Length.min))
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Allaggroldsmbindex.rdata")
 
-d %>% 
+by.year %>% 
   mutate(source = "tidy",
          ar = ar + 3/12) %>% 
   bind_rows(vatican) %>% 
@@ -318,30 +374,28 @@ tbl_mar(con, "ops$einarhj.newstrataarea")
 
 Make minimum adjustment to the code to calculate the fall biomass survey indices. The resulting plot should look something like:
 
-```{r, echo = FALSE}
-# The fall survey
-d <-  
+```{r}
+std.cv        <- 1             # The cv if only one station in a strata
+std.towlength <- 3             # Standard tow length for SMH is 3 nautical miles
+std.width     <- 17            # Standard sweep width in meters
+# Standard area swept, units of square nautical miles
+#   (1852 meters / nm)
+std.area <- std.towlength * std.width / 1852    # This applies for gear 77
+
+min.towlength <- 2             # Minimum "acceptable" towlength
+max.towlength <- 8             # Maximum "acceptable" towlength
+
+
+# ------------------------------------------------------------------------------
+# A. Data gathering
+
+by.length <-  
   # 1. get survey stations -----------------------------------------------------
   lesa_stodvar(con) %>% 
   filter(synaflokkur == 35,
-         veidarfaeri %in% c(77, 78),
          ar > 1995,
-         !ar %in% 2011, 
-         tognumer < 80) %>% 
-  #mutate(r_sweep = if_else(veidarfaeri == 78, 1.25, 1)) %>% 
-  # NOTE: in /net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/stations.r
-  # Additional filters are:
-  #     ar > 1995, !ar %in% 2011, tognumer < 80) %>%
-  # then we have this: 
-  #     mutate(mult = if_else(veidarfaeri == 78, 1.25, 1))
-  #     mutate(index = reitur*100+tognumer)
-  # handle that here or below below??
-  # ALSO:
-  #      i <- is.na(haustrall.all.st$kl.kastad)
-  #      if(any(i)) haustrall.all.st$kl.kastad[i] <- 12
-  #      haustrall.all.st <- inside.reg.bcbreytt(haustrall.all.st)
-
-  select(synis_id, ar, gid = veidarfaeri, toglengd, reitur, tognumer) %>% 
+         !ar %in% 2011) %>% 
+  select(synis_id, ar, toglengd, reitur, tognumer, veidarfaeri) %>% 
   
   # 2. get length data ---------------------------------------------------------
   left_join(lesa_lengdir(con) %>% 
@@ -352,33 +406,25 @@ d <-
               summarise(fjoldi = sum(fjoldi, na.rm = TRUE))) %>% 
               ungroup() %>% 
   
-  # 3. get count data ----------------------------------------------------------
-  left_join(lesa_numer(con) %>% 
-              mutate(r =  ifelse(fj_maelt != 0, 1 + fj_talid/fj_maelt, 1)) %>% 
-              select(synis_id, tegund, r)) %>% 
-  
   # 0. A temporary fix, for zero stations --------------------------------------
   #     TODO: Find a more permanent solution so scripts works for more than
   #           one species (via group_by( ..., tegund))
   mutate(tegund = if_else(is.na(tegund), Species, tegund),
-         lengd  = if_else(is.na(tegund), Length.min, lengd),
-         fjoldi = if_else(is.na(tegund), 0, fjoldi),
-         r      = if_else(is.na(tegund), 1, r)) %>% 
+         lengd  = if_else(is.na(lengd), Length.min, lengd),
+         fjoldi = if_else(is.na(fjoldi), 0, fjoldi)) %>% 
+  
+  # 3. get count data ----------------------------------------------------------
+  get_count_ratio() %>% 
   
   # 4. scale by counted --------------------------------------------------------
-  mutate(N = r * fjoldi / 1e3) %>%  # units of thousand
-
-  # X. scale by gear
-  #  one gear has a wider sweep than the others
-  mutate(N = if_else(gid == 78, 1.25, 1) * N) %>%
-
+  mutate(N = r * fjoldi / 1e3) %>%   # units of thousand
   
   # 5. trim towlength ----------------------------------------------------------
   mutate(toglengd = if_else(toglengd > max.towlength, max.towlength, toglengd),
          toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
   
   # 6. standardize by towlength ------------------------------------------------
-  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 4 miles
+  mutate(N = N * std.towlength/toglengd)  %>% # standardize to per 3 miles
   
   # 7. calculate_biomass from numbers, length and a and b ----------------------
   # 7.a get the length weight coefficients
@@ -386,28 +432,47 @@ d <-
   # 7.b use Newton's law if lwcoefficient for species not specified
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
-         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3) %>% 
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
+  
+# ------------------------------------------------------------------------------
+# B. Summarise abundance and biomass by station
+
+by.station <- 
+  
+  by.length %>% 
   
   # 8. summarise by station ----------------------------------------------------
   # NOTE: here is the first step where statistics by length is dropped
   #       some (minor) recoding above would be needed if one were to take things
   #       forward by each length class
-  group_by(synis_id, tognumer, ar) %>% 
+  group_by(synis_id, tognumer, veidarfaeri, tegund, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
-  # Zero stations
+  # Zero stations - THOUGHT THIS STEP SHOULD BE REDUNDANT
   mutate(N = ifelse(is.na(N), 0, N),
-         B = ifelse(is.na(B), 0, B)) %>% 
+         B = ifelse(is.na(B), 0, B))
+
+
+# ------------------------------------------------------------------------------
+# C. Calculate mean and standard deviation of abundance and biomass of stations
+#    within each strata and raise estimates by the area of the strata
+
+by.strata <-
+  
+  by.station %>% 
   
   # 9. filter stations ---------------------------------------------------------  
-  # filter(tognumer %in% 1:39 | is.na(tognumer)) %>%
+  filter(tognumer < 80 | is.na(tognumer)) %>%
+  
+  # Specific for SMH -----------------------------------------------------------
+  
   
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
   left_join(tbl_mar(con, "ops$einarhj.smhstationsstrata") %>% 
               select(synis_id, strata = newstrata)) %>% 
   # 10.b group by year and strata and calculate number of stations, mean and sd
-  group_by(ar, strata) %>% 
+  group_by(tegund, ar, strata) %>% 
   summarise(sN  = n(),   # number of stations within strata
             n_m  = mean(N, na.rm = TRUE),
             n_d  = ifelse(n() == 1, mean(N, na.rm = TRUE) * std.cv, sd(N)),
@@ -422,16 +487,29 @@ d <-
   #  area is above is in km2, here convert nm2
   mutate(area  = area/1.852^2 / std.area) %>% 
   mutate(n     = n_m  * area,
-         b     = b_m  * area) %>% 
+         b     = b_m  * area) 
+
+# ------------------------------------------------------------------------------
+# D. Summarise data by year
+
+by.year <- 
+  
+  by.strata %>% 
+  
   
   # ----------------------------------------------------------------------------
   # Up to now we only have been operating within Oracle. I.e. sql-scripts via R.
   # Have to collect here because of calc_cv function in the year aggregate step
   # TODO: Fix that, do internally in Oracle
   collect(n = Inf) %>% 
+
+  
+  # ----------------------------------------------------------------------------
+  # some data fall outside strata, drop them - needs some double checking of code
+  drop_na() %>% 
   
   # 11. summarise by year ------------------------------------------------------
-  group_by(ar) %>%
+  group_by(tegund, ar) %>%
   summarise(n = sum(n, na.rm = TRUE),
             # A la Höski
             n.cv = calc_cv(n_m, n_d, area, sN),
@@ -439,18 +517,6 @@ d <-
             # A la Höski
             b.cv = calc_cv(b_m, b_d, area, sN)) %>% 
   ungroup()
-
-d %>% 
-  ggplot(aes(ar, b)) +
-  geom_point() +
-  geom_pointrange(aes(ymin = b * (1 - b.cv),
-                      ymax = b * (1 + b.cv))) +
-  scale_colour_brewer(palette = "Set1") +
-  theme(legend.position = c(0.25, 0.8)) +
-  expand_limits(y = 0) +
-  labs(x = NULL, y = NULL,
-       title = "Biomass indices",
-       subtitle = "Comparison of the orthodoxy (Vatican) and tidy")
 ```
 
 
@@ -472,7 +538,7 @@ vatican <-
   filter(lengd == max(min(lengd), Length.min))
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMH/Allaggrsmhindex.rdata")
 
-d %>% 
+by.year %>% 
   mutate(source = "tidy",
          ar = ar + 3/12) %>% 
   bind_rows(vatican) %>% 
@@ -487,8 +553,6 @@ d %>%
        title = "Biomass indices",
        subtitle = "Comparison of the orthodoxy (Vatican) and tidy")
 ```
-
-NOTE: Bug in the code, no cv returned for year 2017
 
 </div>
 </div>
