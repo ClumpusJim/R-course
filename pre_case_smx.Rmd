@@ -55,25 +55,16 @@ In order to calculate standardized survey indices within Oracle we need in addit
 For this case example these tables have been made available to all:
 ```{r}
 glimpse(tbl_mar(con, "ops$einarhj.lwcoeff"))
-glimpse(tbl_mar(con, "ops$einarhj.smbstationsstrata"))
+#glimpse(tbl_mar(con, "ops$einarhj.smbstationsstrata"))
+glimpse(tbl_mar(con, "ops$einarhj.smb_index_strata"))
 glimpse(tbl_mar(con, "ops$einarhj.oldstrataarea"))
 ```
 
-The smbstationsstrata just matches synis_id (tow) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata.
+The smb_index_strata just matches a tow id, consisting of "reitur" and "tognumer" (reitur * 100 + tognnumer) with a particular stratanumber. The oldstrataarea contains the area (in km2) for each strata.
 
 If one is not interested in running the code within Oracle one would need to supply the above tables as an r-dataframe. The side effect, one would need to change the code below such that anytime an Oracle-table is addressed one would need to add the `collect`-function.
 
-## Select a species
-
-Lets select a species to work with and the length above which we want to obtain
-the standardized survey indices:
-```{r}
-Species <- 1                      # Select a species
-Length.min <- 5                   # Minimum length for indices calculation
-Length.max <- 500                 # Maximum length for indices calculation
-```
-
-A little helper function:
+A couple of helper functions:
 ```{r}
 #' Calculate overall cv from stratfied summary statistics
 #' 
@@ -96,6 +87,7 @@ calc_cv <- function(m, s, area, n) {
   return(cv)
 }
 
+# To raise measured fish to the total fish caught
 get_count_ratio <- function(lengdir){
 
   ratio <-
@@ -112,6 +104,7 @@ get_count_ratio <- function(lengdir){
 }
 ```
 
+
 # The code
 ___
 
@@ -123,10 +116,20 @@ Calculating stratified survey indices is done in four steps:
     - Trim extreme tow lengths and then standardize the number of fish caught at each station to a standard towlength (number of fish per standard tow length in each length class).
     - Estimate the weight of fish in each length class from the length-weight coefficient
 * B. Summarise abundance and weight for each station 
-* C. 
+* C. Calculate mean and standard deviation of abundance and biomass of stations within each strata and raise estimates by the area of the strata
+* D. Summarise data by year
 
+
+Lets select a species to work with and the length above which we want to obtain
+the standardized survey indices:
+```{r}
+Species <- 1                   # Select a species
+Length.min <- 5                   # Minimum length for indices calculation
+Length.max <- 500                 # Maximum length for indices calculation
+```
 
 Some constants used in the standardization process for SMB (you can deviate from them if you want):
+
 ```{r}
 std.cv        <- 1             # The cv if only one station in a strata
 std.towlength <- 4             # Standard tow length for SMB is 4 nautical miles
@@ -136,6 +139,7 @@ min.towlength <- 2             # Minimum "acceptable" towlength
 max.towlength <- 8             # Maximum "acceptable" towlength
 
 Synaflokkur <- 30
+Tognumer <- c(1:39, NA)
 ```
 
 
@@ -147,7 +151,8 @@ by.length <-
   # 1. get survey stations -----------------------------------------------------
   lesa_stodvar(con) %>% 
   filter(synaflokkur == Synaflokkur) %>% 
-  select(synis_id, ar, toglengd, reitur, tognumer, veidarfaeri) %>% 
+  mutate(index = reitur * 100 + tognumer) %>% 
+  select(synis_id, ar, index, reitur, tognumer, veidarfaeri, toglengd) %>% 
   
   # 2. get length data ---------------------------------------------------------
   left_join(lesa_lengdir(con) %>% 
@@ -175,9 +180,11 @@ by.length <-
   mutate(toglengd = if_else(toglengd > max.towlength, max.towlength, toglengd),
          toglengd = if_else(toglengd < min.towlength, min.towlength, toglengd)) %>% 
   
-  # 6. standardize by towlength ------------------------------------------------
-  mutate(N = N /toglengd * std.towlength) %>%       # standardize to per 4 miles
-  # standardize to area swept
+  # 6.a standardize by towlength ------------------------------------------------
+  mutate(N = N / toglengd * std.towlength) %>%      # standardize to per 4 miles
+  # 6.b standardize to area swept
+  #     this does not make much sense here because we already have this above
+  #     need to pass this function further down in the code path
   mutate(N = N / if_else(veidarfaeri == 78, 1.25 * std.width, std.width)) %>% 
   
   # 7. calculate_biomass from numbers, length and a and b ----------------------
@@ -186,7 +193,7 @@ by.length <-
   # 7.b use Newton's law if lwcoefficient for species not specified
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
-         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b / 1e3)
 
 # ------------------------------------------------------------------------------
 # B. Summarise abundance and biomass by station
@@ -199,7 +206,7 @@ by.station <-
   # NOTE: here is the first step where statistics by length is dropped
   #       some (minor) recoding above would be needed if one were to take things
   #       forward by each length class
-  group_by(synis_id, tognumer, veidarfaeri, tegund, ar) %>% 
+  group_by(synis_id, index, reitur, tognumer, veidarfaeri, tegund, ar) %>% 
   summarise(N = sum(N, na.rm = TRUE),
             B = sum(B, na.rm = TRUE)) %>% 
   # Zero stations - THOUGHT THIS STEP SHOULD BE REDUNDANT
@@ -215,12 +222,12 @@ by.strata <-
   by.station %>% 
   
   # 9. filter stations ---------------------------------------------------------  
-  filter(tognumer %in% 1:39 | is.na(tognumer)) %>%
+  filter(tognumer %in% Tognumer) %>%
   
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
-  left_join(tbl_mar(con, "ops$einarhj.smbstationsstrata") %>% 
-              select(synis_id, strata = oldstrata)) %>% 
+  left_join(tbl_mar(con, "ops$einarhj.smb_index_strata") %>% 
+              select(index, strata = stdoldstrata)) %>% 
   # 10.b group by year and strata and calculate number of stations, mean and sd
   group_by(tegund, ar, strata) %>% 
   summarise(sN  = n(),   # number of stations within strata
@@ -372,18 +379,13 @@ The area of the newstrata are found in:
 tbl_mar(con, "ops$einarhj.newstrataarea")
 ```
 
-Make minimum adjustment to the code to calculate the fall biomass survey indices. The resulting plot should look something like:
+Make minimum adjustment to the code to calculate the fall biomass survey indices. The resulting plot should look something like (the tidy part, don't worry about the Vatican):
 
-```{r}
+```{r, echo = FALSE}
 Species <- 23
-#std.cv        <- 1             # The cv if only one station in a strata
-std.towlength <- 3             # Standard tow length for SMB is 4 nautical miles
-#std.width     <- 17 / 1852     # Standard sweep width in nautical miles
-
-#min.towlength <- 2             # Minimum "acceptable" towlength
-#max.towlength <- 8             # Maximum "acceptable" towlength
-
+std.towlength <- 3             # Standard tow length for SMH is 3 nautical miles
 Synaflokkur <- 35
+Tognumer <- c(1:80, NA)
 ```
 
 
@@ -434,7 +436,7 @@ by.length <-
   # 7.b use Newton's law if lwcoefficient for species not specified
   mutate(a = ifelse(is.na(a), 0.01, a),
          b = ifelse(is.na(b), 3.00, b),
-         B  = ifelse(is.na(N), 0, N) * a * lengd^b/1e3)
+         B  = ifelse(is.na(N), 0, N) * a * lengd^b / 1e3)
 
 # ------------------------------------------------------------------------------
 # B. Summarise abundance and biomass by station
@@ -463,7 +465,7 @@ by.strata <-
   by.station %>% 
   
   # 9. filter stations ---------------------------------------------------------  
-  filter(tognumer < 80 | is.na(tognumer)) %>%
+  filter(tognumer %in% Tognumer) %>% 
   
   # 10. summarise by strata ----------------------------------------------------
   # 10.a  Get the strata for each station
@@ -597,6 +599,18 @@ dbWriteTable(con, name = "SMBSTATIONSSTRATA", value = d, overwrite = TRUE)
 detach("file:/net/hafkaldi/export/u2/reikn/R/SurveyWork/SMB/Stations.rdata")
 # sql: grant select on smbstationsstrata to h_fiskar_skoda
 ```
+
+NOTE: In 2018 the stations were fixed to a strata, thus the above is since then replaced with the following:
+
+```{r, eval = FALSE}
+INDEX_STRATA <-
+  newstratas %>% 
+  full_join(oldstratas) %>% 
+  separate(index, c("reitur", "tognumer"), 3, convert = TRUE) %>% 
+  mutate(veidarfaeri = 73)
+dbWriteTable(con, name = "SMB_INDEX_STRATA", value = SMB_INDEX_STRATA, overwrite = TRUE)
+```
+
 
 ## SMH
 
